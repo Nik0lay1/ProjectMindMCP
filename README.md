@@ -43,6 +43,14 @@ ProjectMind is a standalone MCP server that adds persistent memory and local vec
 - **Type Safety**: Full type hints throughout the codebase
 - **Environment Configuration**: Customize via environment variables
 
+## 📚 Documentation
+
+**Quick Links:**
+- 🚀 **[Getting Started Guide](docs/guides/getting-started.md)** - Installation, setup, first steps
+- 📖 **[Complete API Reference](docs/api/tools-reference.md)** - All 22 tools with examples
+- 💡 **[Advanced Usage Guide](docs/guides/advanced-usage.md)** - Power features and workflows
+- 📁 **[Full Documentation](docs/)** - Complete documentation index
+
 ## Installation
 
 ### Prerequisites
