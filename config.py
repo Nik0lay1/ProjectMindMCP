@@ -1,0 +1,133 @@
+import os
+from pathlib import Path
+from typing import Set
+
+AI_DIR = Path(".ai")
+MEMORY_FILE = AI_DIR / "memory.md"
+VECTOR_STORE_DIR = AI_DIR / "vector_store"
+INDEX_IGNORE_FILE = AI_DIR / ".indexignore"
+INDEX_METADATA_FILE = AI_DIR / "index_metadata.json"
+MEMORY_HISTORY_DIR = AI_DIR / "memory_history"
+
+MODEL_NAME = "all-MiniLM-L6-v2"
+
+CHUNK_SIZE = 1000
+CHUNK_OVERLAP = 100
+BATCH_SIZE = 100
+MAX_FILE_SIZE_MB = 10
+
+DEFAULT_IGNORED_DIRS: Set[str] = {
+    ".git",
+    "node_modules",
+    ".ai",
+    "venv",
+    ".venv",
+    "__pycache__",
+    ".idea",
+    ".vscode",
+    "dist",
+    "build",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    "htmlcov",
+    ".coverage",
+    ".tox",
+    "*.egg-info",
+}
+
+BINARY_EXTENSIONS: Set[str] = {
+    ".pyc",
+    ".pyo",
+    ".pyd",
+    ".so",
+    ".dll",
+    ".class",
+    ".exe",
+    ".bin",
+    ".obj",
+    ".o",
+    ".a",
+    ".lib",
+    ".dylib",
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".gif",
+    ".bmp",
+    ".ico",
+    ".svg",
+    ".mp4",
+    ".mp3",
+    ".wav",
+    ".avi",
+    ".mov",
+    ".pdf",
+    ".zip",
+    ".tar",
+    ".gz",
+    ".rar",
+    ".7z",
+}
+
+CODE_EXTENSIONS: Set[str] = {
+    ".py",
+    ".js",
+    ".ts",
+    ".jsx",
+    ".tsx",
+    ".java",
+    ".c",
+    ".cpp",
+    ".h",
+    ".hpp",
+    ".cs",
+    ".go",
+    ".rs",
+    ".rb",
+    ".php",
+    ".swift",
+    ".kt",
+    ".scala",
+    ".r",
+    ".m",
+    ".mm",
+    ".sh",
+    ".bash",
+    ".zsh",
+    ".fish",
+}
+
+TEXT_EXTENSIONS: Set[str] = {
+    ".txt",
+    ".md",
+    ".rst",
+    ".json",
+    ".yaml",
+    ".yml",
+    ".toml",
+    ".xml",
+    ".html",
+    ".css",
+    ".scss",
+    ".sass",
+    ".sql",
+    ".graphql",
+    ".proto",
+}
+
+INDEXABLE_EXTENSIONS = CODE_EXTENSIONS | TEXT_EXTENSIONS
+
+
+def get_max_file_size_bytes() -> int:
+    env_size = os.getenv("PROJECTMIND_MAX_FILE_SIZE_MB")
+    if env_size:
+        try:
+            return int(env_size) * 1024 * 1024
+        except ValueError:
+            pass
+    return MAX_FILE_SIZE_MB * 1024 * 1024
+
+
+def get_ignored_dirs() -> Set[str]:
+    return DEFAULT_IGNORED_DIRS.copy()

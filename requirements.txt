@@ -1,0 +1,5 @@
+mcp
+chromadb
+sentence-transformers
+langchain-text-splitters
+GitPython

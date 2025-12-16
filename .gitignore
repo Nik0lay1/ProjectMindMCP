@@ -1,0 +1,16 @@
+.ai/
+__pycache__/
+venv/
+.venv/
+.idea/
+.vscode/
+.DS_Store
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
