@@ -2,6 +2,8 @@ import os
 from pathlib import Path
 from typing import Set
 
+PROJECT_ROOT = Path.cwd().resolve()
+
 AI_DIR = Path(".ai")
 MEMORY_FILE = AI_DIR / "memory.md"
 VECTOR_STORE_DIR = AI_DIR / "vector_store"
@@ -131,3 +133,34 @@ def get_max_file_size_bytes() -> int:
 
 def get_ignored_dirs() -> Set[str]:
     return DEFAULT_IGNORED_DIRS.copy()
+
+
+def validate_path(path: str) -> Path:
+    """
+    Validates that a path is within the project root directory.
+    Prevents path traversal attacks.
+    
+    Args:
+        path: Path string to validate
+        
+    Returns:
+        Resolved Path object
+        
+    Raises:
+        ValueError: If path is outside project root or invalid
+    """
+    try:
+        if not path or not isinstance(path, str):
+            raise ValueError("Path must be a non-empty string")
+        
+        target_path = Path(path).resolve()
+        
+        if not target_path.is_relative_to(PROJECT_ROOT):
+            raise ValueError(
+                f"Path '{path}' is outside project root. "
+                f"Only paths within {PROJECT_ROOT} are allowed."
+            )
+        
+        return target_path
+    except (OSError, RuntimeError) as e:
+        raise ValueError(f"Invalid path '{path}': {e}")

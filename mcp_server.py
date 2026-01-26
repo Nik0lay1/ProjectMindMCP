@@ -23,6 +23,7 @@ from config import (
     INDEXABLE_EXTENSIONS,
     get_max_file_size_bytes,
     get_ignored_dirs,
+    validate_path,
 )
 from incremental_indexing import IndexMetadata
 
@@ -39,38 +40,45 @@ def log(message: str) -> None:
 def startup_check() -> None:
     log(f"Running startup check in {os.getcwd()}...")
 
-    if not AI_DIR.exists():
-        AI_DIR.mkdir(parents=True)
-        log(f"Created {AI_DIR}")
+    try:
+        if not AI_DIR.exists():
+            AI_DIR.mkdir(parents=True)
+            log(f"Created {AI_DIR}")
+    except (OSError, PermissionError) as e:
+        log(f"Warning: Could not create {AI_DIR}: {e}. Server will continue if directory exists.")
 
-    gitignore_path = Path(".gitignore")
-    ai_ignored = False
-    pycache_ignored = False
+    try:
+        gitignore_path = Path(".gitignore")
+        ai_ignored = False
+        pycache_ignored = False
 
-    if gitignore_path.exists():
-        content = gitignore_path.read_text()
-        if ".ai/" in content or ".ai" in content:
-            ai_ignored = True
-        if "__pycache__" in content:
-            pycache_ignored = True
+        if gitignore_path.exists():
+            content = gitignore_path.read_text()
+            if ".ai/" in content or ".ai" in content:
+                ai_ignored = True
+            if "__pycache__" in content:
+                pycache_ignored = True
 
-        if not ai_ignored or not pycache_ignored:
-            with open(gitignore_path, "a") as f:
-                if not content.endswith("\n") and content:
-                    f.write("\n")
-                if not ai_ignored:
-                    f.write(".ai/\n")
-                    log("Added .ai/ to .gitignore")
-                if not pycache_ignored:
-                    f.write("__pycache__/\n")
-                    log("Added __pycache__/ to .gitignore")
-    else:
-        with open(gitignore_path, "w") as f:
-            f.write(".ai/\n__pycache__/\n")
-        log("Created .gitignore with .ai/ and __pycache__/")
+            if not ai_ignored or not pycache_ignored:
+                with open(gitignore_path, "a") as f:
+                    if not content.endswith("\n") and content:
+                        f.write("\n")
+                    if not ai_ignored:
+                        f.write(".ai/\n")
+                        log("Added .ai/ to .gitignore")
+                    if not pycache_ignored:
+                        f.write("__pycache__/\n")
+                        log("Added __pycache__/ to .gitignore")
+        else:
+            with open(gitignore_path, "w") as f:
+                f.write(".ai/\n__pycache__/\n")
+            log("Created .gitignore with .ai/ and __pycache__/")
+    except (OSError, PermissionError) as e:
+        log(f"Warning: Could not modify .gitignore: {e}")
 
-    if not MEMORY_FILE.exists():
-        template = """# Project Memory
+    try:
+        if not MEMORY_FILE.exists():
+            template = """# Project Memory
 
 ## Status
 - [ ] Initial Setup
@@ -82,8 +90,10 @@ def startup_check() -> None:
 ## Recent Decisions
 - Project initialized.
 """
-        MEMORY_FILE.write_text(template)
-        log(f"Created {MEMORY_FILE}")
+            MEMORY_FILE.write_text(template)
+            log(f"Created {MEMORY_FILE}")
+    except (OSError, PermissionError) as e:
+        log(f"Warning: Could not create {MEMORY_FILE}: {e}")
 
 
 startup_check()
@@ -842,8 +852,11 @@ def analyze_code_complexity(target_path: str = ".") -> str:
     try:
         from radon.complexity import cc_visit
         from radon.metrics import mi_visit
-
-        target = Path(target_path)
+    except ImportError:
+        return "Error: radon not installed. Run: pip install radon"
+    
+    try:
+        target = validate_path(target_path)
         if not target.exists():
             return f"Path not found: {target_path}"
 
@@ -889,8 +902,8 @@ def analyze_code_complexity(target_path: str = ".") -> str:
         results.append(f"- Average complexity: {avg_complexity:.2f}")
 
         return "\n".join(results)
-    except ImportError:
-        return "Error: radon not installed. Run: pip install radon"
+    except ValueError as e:
+        return f"Error: {e}"
     except Exception as e:
         return f"Error analyzing complexity: {e}"
 
@@ -900,8 +913,11 @@ def analyze_code_quality(target_path: str = ".", max_files: int = 10) -> str:
     try:
         from pylint.lint import Run
         from io import StringIO
-
-        target = Path(target_path)
+    except ImportError:
+        return "Error: pylint not installed. Run: pip install pylint"
+    
+    try:
+        target = validate_path(target_path)
         if not target.exists():
             return f"Path not found: {target_path}"
 
@@ -959,8 +975,8 @@ def analyze_code_quality(target_path: str = ".", max_files: int = 10) -> str:
             results.append("\n✅ No major issues found!")
 
         return "\n".join(results)
-    except ImportError:
-        return "Error: pylint not installed. Run: pip install pylint"
+    except ValueError as e:
+        return f"Error: {e}"
     except Exception as e:
         return f"Error analyzing quality: {e}"
 

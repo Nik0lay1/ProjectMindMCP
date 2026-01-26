@@ -31,3 +31,13 @@ repos:
         additional_dependencies:
           - types-requests
         args: [--ignore-missing-imports]
+
+  - repo: local
+    hooks:
+      - id: organize-docs
+        name: Organize documentation
+        entry: python scripts/organize_docs.py --dry-run
+        language: system
+        files: '\.md$'
+        pass_filenames: false
+        always_run: false
