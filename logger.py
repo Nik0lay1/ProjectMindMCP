@@ -1,4 +1,5 @@
 """Centralized logging configuration for ProjectMind"""
+
 import logging
 import sys
 from logging.handlers import RotatingFileHandler
@@ -29,18 +30,15 @@ def setup_logger(name: str = "ProjectMind") -> logging.Logger:
     logger.handlers.clear()
 
     formatter = logging.Formatter(
-        fmt='[%(asctime)s] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
+        fmt="[%(asctime)s] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
 
     try:
         AI_DIR.mkdir(parents=True, exist_ok=True)
 
         file_handler = RotatingFileHandler(
-            LOG_FILE,
-            maxBytes=LOG_MAX_BYTES,
-            backupCount=LOG_BACKUP_COUNT,
-            encoding='utf-8'
+            LOG_FILE, maxBytes=LOG_MAX_BYTES, backupCount=LOG_BACKUP_COUNT, encoding="utf-8"
         )
         file_handler.setLevel(logging.DEBUG)
         file_handler.setFormatter(formatter)

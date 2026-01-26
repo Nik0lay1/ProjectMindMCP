@@ -52,34 +52,34 @@ class TestValidatePath(unittest.TestCase):
 
 
 class TestSafeReadText(unittest.TestCase):
-    @patch('pathlib.Path.read_text')
+    @patch("pathlib.Path.read_text")
     def test_safe_read_text_utf8(self, mock_read_text):
         """Test reading UTF-8 file successfully"""
         mock_read_text.return_value = "Hello World"
         result = safe_read_text(Path("test.txt"))
         self.assertEqual(result, "Hello World")
-        mock_read_text.assert_called_once_with(encoding='utf-8')
+        mock_read_text.assert_called_once_with(encoding="utf-8")
 
-    @patch('pathlib.Path.read_text')
+    @patch("pathlib.Path.read_text")
     def test_safe_read_text_fallback_to_latin1(self, mock_read_text):
         """Test fallback to Latin-1 when UTF-8 fails"""
         mock_read_text.side_effect = [
-            UnicodeDecodeError('utf-8', b'', 0, 1, 'invalid'),
-            UnicodeDecodeError('utf-8-sig', b'', 0, 1, 'invalid'),
-            "Café"
+            UnicodeDecodeError("utf-8", b"", 0, 1, "invalid"),
+            UnicodeDecodeError("utf-8-sig", b"", 0, 1, "invalid"),
+            "Café",
         ]
         result = safe_read_text(Path("test.txt"))
         self.assertEqual(result, "Café")
         self.assertEqual(mock_read_text.call_count, 3)
 
-    @patch('pathlib.Path.read_text')
+    @patch("pathlib.Path.read_text")
     def test_safe_read_text_raises_on_all_encoding_failures(self, mock_read_text):
         """Test that UnicodeDecodeError is raised when all encodings fail"""
-        mock_read_text.side_effect = UnicodeDecodeError('utf-8', b'', 0, 1, 'invalid')
+        mock_read_text.side_effect = UnicodeDecodeError("utf-8", b"", 0, 1, "invalid")
         with self.assertRaises(UnicodeDecodeError):
             safe_read_text(Path("test.txt"))
 
-    @patch('pathlib.Path.read_text')
+    @patch("pathlib.Path.read_text")
     def test_safe_read_text_raises_io_error(self, mock_read_text):
         """Test that IOError is raised on file read failure"""
         mock_read_text.side_effect = PermissionError("Access denied")
@@ -88,7 +88,7 @@ class TestSafeReadText(unittest.TestCase):
 
 
 class TestConfigFunctions(unittest.TestCase):
-    @patch.dict(os.environ, {'PROJECTMIND_MAX_FILE_SIZE_MB': '50'})
+    @patch.dict(os.environ, {"PROJECTMIND_MAX_FILE_SIZE_MB": "50"})
     def test_get_max_file_size_bytes_from_env(self):
         """Test reading max file size from environment variable"""
         result = get_max_file_size_bytes()
@@ -100,13 +100,13 @@ class TestConfigFunctions(unittest.TestCase):
         result = get_max_file_size_bytes()
         self.assertEqual(result, MAX_FILE_SIZE_MB * 1024 * 1024)
 
-    @patch.dict(os.environ, {'PROJECTMIND_MAX_FILE_SIZE_MB': 'invalid'})
+    @patch.dict(os.environ, {"PROJECTMIND_MAX_FILE_SIZE_MB": "invalid"})
     def test_get_max_file_size_bytes_invalid_env(self):
         """Test fallback to default on invalid env value"""
         result = get_max_file_size_bytes()
         self.assertEqual(result, MAX_FILE_SIZE_MB * 1024 * 1024)
 
-    @patch.dict(os.environ, {'PROJECTMIND_MAX_MEMORY_MB': '200'})
+    @patch.dict(os.environ, {"PROJECTMIND_MAX_MEMORY_MB": "200"})
     def test_get_max_memory_bytes_from_env(self):
         """Test reading max memory from environment variable"""
         result = get_max_memory_bytes()
@@ -128,10 +128,10 @@ class TestConfigFunctions(unittest.TestCase):
     def test_get_ignored_dirs_contains_common_dirs(self):
         """Test that ignored dirs contain common directories"""
         dirs = get_ignored_dirs()
-        self.assertIn('.git', dirs)
-        self.assertIn('node_modules', dirs)
-        self.assertIn('__pycache__', dirs)
+        self.assertIn(".git", dirs)
+        self.assertIn("node_modules", dirs)
+        self.assertIn("__pycache__", dirs)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

@@ -1,4 +1,5 @@
 """Tests for logging system"""
+
 import os
 import sys
 
@@ -38,7 +39,7 @@ def test_log_file_creation():
     logger.error("Test error message")
 
     if LOG_FILE.exists():
-        content = LOG_FILE.read_text(encoding='utf-8')
+        content = LOG_FILE.read_text(encoding="utf-8")
         assert "Test log message" in content
         assert "Test warning message" in content
         assert "Test error message" in content
@@ -69,10 +70,12 @@ def test_log_rotation_config():
     logger = get_logger()
 
     for handler in logger.handlers:
-        if hasattr(handler, 'maxBytes'):
+        if hasattr(handler, "maxBytes"):
             assert handler.maxBytes == 10 * 1024 * 1024
             assert handler.backupCount == 5
-            print(f"  [OK] Log rotation configured: {handler.maxBytes} bytes, {handler.backupCount} backups")
+            print(
+                f"  [OK] Log rotation configured: {handler.maxBytes} bytes, {handler.backupCount} backups"
+            )
             return
 
     print("  [WARNING] No rotating file handler found")
@@ -102,5 +105,6 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n[ERROR] Test failed with error: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)

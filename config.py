@@ -204,13 +204,14 @@ def safe_read_text(file_path: Path) -> str:
     global _file_cache
     if _file_cache is None:
         from cache_manager import FileCache
+
         _file_cache = FileCache(capacity=50)
 
     cached_content = _file_cache.get(file_path)
     if cached_content is not None:
         return cached_content
 
-    encodings = ['utf-8', 'utf-8-sig', 'latin-1', 'cp1252', 'iso-8859-1']
+    encodings = ["utf-8", "utf-8-sig", "latin-1", "cp1252", "iso-8859-1"]
 
     for encoding in encodings:
         try:
@@ -223,11 +224,11 @@ def safe_read_text(file_path: Path) -> str:
             raise OSError(f"Error reading file {file_path}: {e}") from e
 
     raise UnicodeDecodeError(
-        'multi-encoding',
-        b'',
+        "multi-encoding",
+        b"",
         0,
         1,
-        f"Cannot decode {file_path} with any supported encoding: {encodings}"
+        f"Cannot decode {file_path} with any supported encoding: {encodings}",
     )
 
 
@@ -241,5 +242,6 @@ def get_file_cache_stats():
     global _file_cache
     if _file_cache is None:
         from cache_manager import FileCache
+
         _file_cache = FileCache(capacity=50)
     return _file_cache.get_stats()

@@ -220,11 +220,7 @@ def test_code_metrics():
 
     complexity = analyze_code_complexity(".")
     print(f"Complexity Result: {complexity[:200]}...")
-    assert (
-        "COMPLEXITY" in complexity
-        or "No Python files" in complexity
-        or "Error" in complexity
-    )
+    assert "COMPLEXITY" in complexity or "No Python files" in complexity or "Error" in complexity
 
     coverage = get_test_coverage_info()
     print(f"Coverage Result: {coverage}")

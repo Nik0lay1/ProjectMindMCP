@@ -11,17 +11,19 @@ from incremental_indexing import IndexMetadata, atomic_write
 
 
 class TestAtomicWrite(unittest.TestCase):
-    @patch('incremental_indexing.tempfile.mkstemp')
-    @patch('incremental_indexing.os.fdopen')
-    @patch('incremental_indexing.os.replace')
-    @patch('incremental_indexing.os.fsync')
-    def test_atomic_write_creates_temp_and_replaces(self, mock_fsync, mock_replace, mock_fdopen, mock_mkstemp):
+    @patch("incremental_indexing.tempfile.mkstemp")
+    @patch("incremental_indexing.os.fdopen")
+    @patch("incremental_indexing.os.replace")
+    @patch("incremental_indexing.os.fsync")
+    def test_atomic_write_creates_temp_and_replaces(
+        self, mock_fsync, mock_replace, mock_fdopen, mock_mkstemp
+    ):
         """Test that atomic_write creates temp file and replaces original"""
-        mock_mkstemp.return_value = (42, '/tmp/.test.json.tmp')
+        mock_mkstemp.return_value = (42, "/tmp/.test.json.tmp")
         mock_file = MagicMock()
         mock_fdopen.return_value.__enter__.return_value = mock_file
 
-        test_path = Path('/test/test.json')
+        test_path = Path("/test/test.json")
         test_content = '{"test": true}'
 
         atomic_write(test_path, test_content)
@@ -29,16 +31,18 @@ class TestAtomicWrite(unittest.TestCase):
         mock_file.write.assert_called_once_with(test_content)
         mock_file.flush.assert_called_once()
         mock_fsync.assert_called_once()
-        mock_replace.assert_called_once_with('/tmp/.test.json.tmp', test_path)
+        mock_replace.assert_called_once_with("/tmp/.test.json.tmp", test_path)
 
-    @patch('incremental_indexing.tempfile.mkstemp')
-    @patch('incremental_indexing.os.fdopen')
-    @patch('incremental_indexing.os.replace')
-    @patch('incremental_indexing.os.unlink')
-    @patch('incremental_indexing.os.fsync')
-    def test_atomic_write_cleanup_on_error(self, mock_fsync, mock_unlink, mock_replace, mock_fdopen, mock_mkstemp):
+    @patch("incremental_indexing.tempfile.mkstemp")
+    @patch("incremental_indexing.os.fdopen")
+    @patch("incremental_indexing.os.replace")
+    @patch("incremental_indexing.os.unlink")
+    @patch("incremental_indexing.os.fsync")
+    def test_atomic_write_cleanup_on_error(
+        self, mock_fsync, mock_unlink, mock_replace, mock_fdopen, mock_mkstemp
+    ):
         """Test that temp file is cleaned up on error"""
-        temp_path = '/tmp/.test.json.tmp'
+        temp_path = "/tmp/.test.json.tmp"
         mock_mkstemp.return_value = (42, temp_path)
         mock_file = MagicMock()
         mock_file.fileno.return_value = 42
@@ -46,13 +50,13 @@ class TestAtomicWrite(unittest.TestCase):
         mock_replace.side_effect = OSError("Replace failed")
 
         with self.assertRaises(OSError):
-            atomic_write(Path('/test/test.json'), 'content')
+            atomic_write(Path("/test/test.json"), "content")
 
         mock_unlink.assert_called_once_with(temp_path)
 
 
 class TestIndexMetadata(unittest.TestCase):
-    @patch('incremental_indexing.INDEX_METADATA_FILE')
+    @patch("incremental_indexing.INDEX_METADATA_FILE")
     def test_load_empty_when_file_not_exists(self, mock_file):
         """Test that empty metadata is loaded when file doesn't exist"""
         mock_file.exists.return_value = False
@@ -61,19 +65,19 @@ class TestIndexMetadata(unittest.TestCase):
 
         self.assertEqual(metadata.metadata, {})
 
-    @patch('incremental_indexing.INDEX_METADATA_FILE')
-    @patch('builtins.open', new_callable=mock_open, read_data='{"test.py": {"mtime": 123.45}}')
+    @patch("incremental_indexing.INDEX_METADATA_FILE")
+    @patch("builtins.open", new_callable=mock_open, read_data='{"test.py": {"mtime": 123.45}}')
     def test_load_existing_metadata(self, mock_file_open, mock_file):
         """Test loading existing metadata from file"""
         mock_file.exists.return_value = True
 
         metadata = IndexMetadata()
 
-        self.assertIn('test.py', metadata.metadata)
-        self.assertEqual(metadata.metadata['test.py']['mtime'], 123.45)
+        self.assertIn("test.py", metadata.metadata)
+        self.assertEqual(metadata.metadata["test.py"]["mtime"], 123.45)
 
-    @patch('incremental_indexing.INDEX_METADATA_FILE')
-    @patch('builtins.open', side_effect=Exception("Read error"))
+    @patch("incremental_indexing.INDEX_METADATA_FILE")
+    @patch("builtins.open", side_effect=Exception("Read error"))
     def test_load_handles_error(self, mock_file_open, mock_file):
         """Test that load handles errors gracefully"""
         mock_file.exists.return_value = True
@@ -82,8 +86,8 @@ class TestIndexMetadata(unittest.TestCase):
 
         self.assertEqual(metadata.metadata, {})
 
-    @patch('incremental_indexing.atomic_write')
-    @patch('logger.get_logger')
+    @patch("incremental_indexing.atomic_write")
+    @patch("logger.get_logger")
     def test_save_uses_atomic_write(self, mock_logger, mock_atomic_write):
         """Test that save uses atomic_write"""
         metadata = IndexMetadata()
@@ -123,7 +127,7 @@ class TestIndexMetadata(unittest.TestCase):
         self.assertEqual(metadata.metadata["test.py"]["mtime"], 123.45)
         self.assertIn("indexed_at", metadata.metadata["test.py"])
 
-    @patch('pathlib.Path.stat')
+    @patch("pathlib.Path.stat")
     def test_get_changed_files_detects_changes(self, mock_stat):
         """Test that get_changed_files detects modified files"""
         metadata = IndexMetadata()
@@ -140,7 +144,7 @@ class TestIndexMetadata(unittest.TestCase):
         self.assertIn(Path("old.py"), changed)
         self.assertIn(Path("new.py"), changed)
 
-    @patch('pathlib.Path.stat')
+    @patch("pathlib.Path.stat")
     def test_get_changed_files_skips_unchanged(self, mock_stat):
         """Test that unchanged files are not returned"""
         metadata = IndexMetadata()
@@ -158,10 +162,7 @@ class TestIndexMetadata(unittest.TestCase):
     def test_remove_deleted_files(self):
         """Test removing deleted files from metadata"""
         metadata = IndexMetadata()
-        metadata.metadata = {
-            "exists.py": {"mtime": 100.0},
-            "deleted.py": {"mtime": 100.0}
-        }
+        metadata.metadata = {"exists.py": {"mtime": 100.0}, "deleted.py": {"mtime": 100.0}}
 
         existing = {"exists.py"}
         metadata.remove_deleted_files(existing)
@@ -174,7 +175,7 @@ class TestIndexMetadata(unittest.TestCase):
         metadata = IndexMetadata()
         metadata.metadata = {
             "file1.py": {"mtime": 100.0, "indexed_at": "2024-01-01T10:00:00"},
-            "file2.py": {"mtime": 200.0, "indexed_at": "2024-01-01T11:00:00"}
+            "file2.py": {"mtime": 200.0, "indexed_at": "2024-01-01T11:00:00"},
         }
 
         stats = metadata.get_stats()
@@ -192,5 +193,5 @@ class TestIndexMetadata(unittest.TestCase):
         self.assertIsNone(stats["last_index"])
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

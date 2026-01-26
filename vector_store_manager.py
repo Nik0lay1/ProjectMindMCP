@@ -55,8 +55,7 @@ class VectorStoreManager:
             self.chroma_client = chromadb.PersistentClient(path=str(VECTOR_STORE_DIR))
             self.embedding_fn = LocalSentenceTransformerEmbeddingFunction(MODEL_NAME)
             self.collection = self.chroma_client.get_or_create_collection(
-                name=self.collection_name,
-                embedding_function=self.embedding_fn
+                name=self.collection_name, embedding_function=self.embedding_fn
             )
 
             self._initialized = True
@@ -91,8 +90,7 @@ class VectorStoreManager:
         try:
             self.chroma_client.delete_collection(self.collection_name)
             self.collection = self.chroma_client.get_or_create_collection(
-                name=self.collection_name,
-                embedding_function=self.embedding_fn
+                name=self.collection_name, embedding_function=self.embedding_fn
             )
             logger.info(f"Collection '{self.collection_name}' cleared successfully")
             return None
@@ -123,7 +121,7 @@ class VectorStoreManager:
         query_texts: list[str],
         n_results: int = 5,
         where: dict | None = None,
-        where_document: dict | None = None
+        where_document: dict | None = None,
     ) -> dict | None:
         """
         Queries the vector store with caching.
@@ -152,7 +150,7 @@ class VectorStoreManager:
                 query_texts=query_texts,
                 n_results=n_results,
                 where=where,
-                where_document=where_document
+                where_document=where_document,
             )
             self._query_cache.put(cache_key, result)
             return result
@@ -165,7 +163,7 @@ class VectorStoreManager:
         query_texts: list[str],
         n_results: int,
         where: dict | None,
-        where_document: dict | None
+        where_document: dict | None,
     ) -> str:
         """
         Generates a unique cache key for query parameters.
@@ -183,7 +181,7 @@ class VectorStoreManager:
             "query_texts": query_texts,
             "n_results": n_results,
             "where": where,
-            "where_document": where_document
+            "where_document": where_document,
         }
         key_str = json.dumps(key_data, sort_keys=True)
         return hashlib.sha256(key_str.encode()).hexdigest()
@@ -197,12 +195,7 @@ class VectorStoreManager:
         """
         return self._query_cache.get_stats()
 
-    def upsert(
-        self,
-        documents: list[str],
-        metadatas: list[dict],
-        ids: list[str]
-    ) -> bool:
+    def upsert(self, documents: list[str], metadatas: list[dict], ids: list[str]) -> bool:
         """
         Upserts documents into the collection.
 
@@ -219,11 +212,7 @@ class VectorStoreManager:
             return False
 
         try:
-            coll.upsert(
-                documents=documents,
-                metadatas=metadatas,
-                ids=ids
-            )
+            coll.upsert(documents=documents, metadatas=metadatas, ids=ids)
             return True
         except Exception as e:
             logger.error(f"Error upserting to collection: {e}", exc_info=True)

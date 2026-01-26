@@ -49,7 +49,9 @@ def test_memory_limit_flush():
 
     if len(batches) > initial_batches:
         assert len(batches[0][0]) >= 1
-        print(f"  [DEBUG] Auto-flush triggered: {len(batches)} batches, first batch has {len(batches[0][0])} docs")
+        print(
+            f"  [DEBUG] Auto-flush triggered: {len(batches)} batches, first batch has {len(batches[0][0])} docs"
+        )
 
     indexer.add_chunk(large_doc, {"source": "file3.py"}, "file3_0")
     indexer.flush()
@@ -115,7 +117,9 @@ def test_memory_estimation():
     assert stats["total_chunks"] == 20
     assert stats["current_buffer_chunks"] == 0
 
-    print(f"  [OK] Memory estimation triggered {flush_count[0]} auto-flushes for 20 docs with {limit} byte limit")
+    print(
+        f"  [OK] Memory estimation triggered {flush_count[0]} auto-flushes for 20 docs with {limit} byte limit"
+    )
 
 
 def test_empty_flush():
@@ -221,5 +225,6 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n[ERROR] Test failed with error: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)

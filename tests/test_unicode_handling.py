@@ -1,4 +1,5 @@
 """Tests for Unicode handling improvements"""
+
 import os
 import sys
 import tempfile
@@ -13,13 +14,18 @@ def test_utf8_file():
     """Test reading UTF-8 file"""
     print("Testing UTF-8 file...")
 
-    with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', delete=False, suffix='.txt') as f:
-        f.write("Hello Unicode: \u0423\u043a\u0440\u0430\u0457\u043d\u0441\u044c\u043a\u0430 \u043c\u043e\u0432\u0430 \U0001f600")
+    with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", delete=False, suffix=".txt") as f:
+        f.write(
+            "Hello Unicode: \u0423\u043a\u0440\u0430\u0457\u043d\u0441\u044c\u043a\u0430 \u043c\u043e\u0432\u0430 \U0001f600"
+        )
         temp_path = Path(f.name)
 
     try:
         content = safe_read_text(temp_path)
-        assert "\u0423\u043a\u0440\u0430\u0457\u043d\u0441\u044c\u043a\u0430 \u043c\u043e\u0432\u0430" in content
+        assert (
+            "\u0423\u043a\u0440\u0430\u0457\u043d\u0441\u044c\u043a\u0430 \u043c\u043e\u0432\u0430"
+            in content
+        )
         assert "\U0001f600" in content
         print("  [OK] UTF-8 file read successfully")
     finally:
@@ -30,7 +36,7 @@ def test_latin1_file():
     """Test reading Latin-1 file"""
     print("Testing Latin-1 file...")
 
-    with tempfile.NamedTemporaryFile(mode='wb', delete=False, suffix='.txt') as f:
+    with tempfile.NamedTemporaryFile(mode="wb", delete=False, suffix=".txt") as f:
         f.write(b"Caf\xe9 \xe0 la mode")
         temp_path = Path(f.name)
 
@@ -46,8 +52,8 @@ def test_windows1252_file():
     """Test reading Windows-1252 file"""
     print("Testing Windows-1252 file...")
 
-    with tempfile.NamedTemporaryFile(mode='wb', delete=False, suffix='.txt') as f:
-        f.write(b'Smart quotes: \x93text\x94')
+    with tempfile.NamedTemporaryFile(mode="wb", delete=False, suffix=".txt") as f:
+        f.write(b"Smart quotes: \x93text\x94")
         temp_path = Path(f.name)
 
     try:
@@ -62,8 +68,8 @@ def test_utf8_with_bom():
     """Test reading UTF-8 with BOM file"""
     print("Testing UTF-8 with BOM...")
 
-    with tempfile.NamedTemporaryFile(mode='wb', delete=False, suffix='.txt') as f:
-        f.write(b'\xef\xbb\xbfUTF-8 with BOM')
+    with tempfile.NamedTemporaryFile(mode="wb", delete=False, suffix=".txt") as f:
+        f.write(b"\xef\xbb\xbfUTF-8 with BOM")
         temp_path = Path(f.name)
 
     try:
@@ -108,5 +114,6 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n[ERROR] Test failed with error: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)

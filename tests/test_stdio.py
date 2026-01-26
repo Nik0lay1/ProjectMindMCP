@@ -16,7 +16,7 @@ def test_mcp_server():
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
-        bufsize=0
+        bufsize=0,
     )
 
     try:
@@ -28,11 +28,8 @@ def test_mcp_server():
             "params": {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {},
-                "clientInfo": {
-                    "name": "test-client",
-                    "version": "1.0.0"
-                }
-            }
+                "clientInfo": {"name": "test-client", "version": "1.0.0"},
+            },
         }
 
         print("Sending initialize request...")
@@ -72,6 +69,7 @@ def test_mcp_server():
     finally:
         process.terminate()
         process.wait(timeout=1)
+
 
 if __name__ == "__main__":
     success = test_mcp_server()

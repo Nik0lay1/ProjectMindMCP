@@ -85,7 +85,7 @@ class LRUCache:
                 "misses": self.misses,
                 "size": len(self.cache),
                 "capacity": self.capacity,
-                "hit_rate": f"{hit_rate:.2f}%"
+                "hit_rate": f"{hit_rate:.2f}%",
             }
 
 
@@ -173,7 +173,8 @@ class TTLCache:
         with self.lock:
             current_time = time.time()
             expired_keys = [
-                key for key, (_, timestamp) in self.cache.items()
+                key
+                for key, (_, timestamp) in self.cache.items()
                 if current_time - timestamp >= self.ttl_seconds
             ]
 
@@ -203,7 +204,7 @@ class TTLCache:
                 "max_size": self.max_size,
                 "expirations": self.expirations,
                 "ttl_seconds": self.ttl_seconds,
-                "hit_rate": f"{hit_rate:.2f}%"
+                "hit_rate": f"{hit_rate:.2f}%",
             }
 
 

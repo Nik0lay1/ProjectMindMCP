@@ -95,9 +95,6 @@ startup_check()
 mcp = FastMCP("ProjectMind")
 
 
-
-
-
 def load_index_ignore_patterns() -> set[str]:
     if not INDEX_IGNORE_FILE.exists():
         return set()
@@ -113,9 +110,6 @@ def load_index_ignore_patterns() -> set[str]:
     except Exception as e:
         log(f"Error reading .indexignore: {e}")
         return set()
-
-
-
 
 
 @mcp.resource("project://memory")
@@ -261,9 +255,9 @@ def generate_project_summary() -> str:
         memory = read_memory()
         if memory and "Memory file not found" not in memory:
             summary_parts.append("## Current Memory State")
-            lines = memory.split('\n')[:30]
-            summary_parts.append('\n'.join(lines))
-            if len(memory.split('\n')) > 30:
+            lines = memory.split("\n")[:30]
+            summary_parts.append("\n".join(lines))
+            if len(memory.split("\n")) > 30:
                 summary_parts.append("\n... (truncated, see full memory)\n")
 
         try:
@@ -272,8 +266,8 @@ def generate_project_summary() -> str:
             if commits:
                 summary_parts.append("\n## Recent Activity (Last 5 Commits)")
                 for commit in commits:
-                    date_str = datetime.fromtimestamp(commit.committed_date).strftime('%Y-%m-%d')
-                    message = commit.message.strip().split('\n')[0][:80]
+                    date_str = datetime.fromtimestamp(commit.committed_date).strftime("%Y-%m-%d")
+                    message = commit.message.strip().split("\n")[0][:80]
                     summary_parts.append(f"- {date_str}: {message}")
         except Exception:
             pass
@@ -289,7 +283,7 @@ def generate_project_summary() -> str:
         stats = get_index_stats()
         summary_parts.append(f"- {stats}")
 
-        return '\n'.join(summary_parts)
+        return "\n".join(summary_parts)
     except Exception as e:
         return f"Error generating summary: {e}"
 
@@ -304,14 +298,14 @@ def extract_tech_stack() -> str:
             tech_stack.append("## Python Project")
             if "dependencies" in content:
                 tech_stack.append("\n**Dependencies:**")
-                lines = content.split('\n')
+                lines = content.split("\n")
                 in_deps = False
                 for line in lines:
-                    if 'dependencies = [' in line:
+                    if "dependencies = [" in line:
                         in_deps = True
                         continue
                     if in_deps:
-                        if ']' in line:
+                        if "]" in line:
                             break
                         if '"' in line:
                             tech_stack.append(f"- {line.strip()}")
@@ -320,12 +314,13 @@ def extract_tech_stack() -> str:
             content = Path("requirements.txt").read_text()
             tech_stack.append("## Python Project")
             tech_stack.append("\n**Dependencies:**")
-            for line in content.split('\n'):
-                if line.strip() and not line.startswith('#'):
+            for line in content.split("\n"):
+                if line.strip() and not line.startswith("#"):
                     tech_stack.append(f"- {line.strip()}")
 
         if Path("package.json").exists():
             import json
+
             with open("package.json") as f:
                 data = json.load(f)
             tech_stack.append("\n## JavaScript/Node.js Project")
@@ -345,7 +340,7 @@ def extract_tech_stack() -> str:
         if not tech_stack:
             return "No standard dependency files found (pyproject.toml, package.json, etc.)"
 
-        return '\n'.join(tech_stack)
+        return "\n".join(tech_stack)
     except Exception as e:
         return f"Error extracting tech stack: {e}"
 
@@ -371,7 +366,7 @@ def analyze_project_structure() -> str:
             structure.append(f"- `{dir_name}/` ({count} items)")
 
         file_types = {}
-        for ext in ['.py', '.js', '.ts', '.jsx', '.tsx', '.go', '.rs', '.java', '.c', '.cpp']:
+        for ext in [".py", ".js", ".ts", ".jsx", ".tsx", ".go", ".rs", ".java", ".c", ".cpp"]:
             count = len(list(root.rglob(f"*{ext}")))
             if count > 0:
                 file_types[ext] = count
@@ -382,8 +377,16 @@ def analyze_project_structure() -> str:
                 structure.append(f"- `{ext}`: {count} files")
 
         config_files = []
-        for cfg in ['pyproject.toml', 'package.json', 'Cargo.toml', 'go.mod',
-                    '.gitignore', 'docker-compose.yml', 'Dockerfile', '.env.example']:
+        for cfg in [
+            "pyproject.toml",
+            "package.json",
+            "Cargo.toml",
+            "go.mod",
+            ".gitignore",
+            "docker-compose.yml",
+            "Dockerfile",
+            ".env.example",
+        ]:
             if Path(cfg).exists():
                 config_files.append(cfg)
 
@@ -392,7 +395,7 @@ def analyze_project_structure() -> str:
             for cfg in config_files:
                 structure.append(f"- {cfg}")
 
-        return '\n'.join(structure)
+        return "\n".join(structure)
     except Exception as e:
         return f"Error analyzing structure: {e}"
 
@@ -411,6 +414,7 @@ def get_recent_changes_summary(days: int = 7) -> str:
 
     try:
         from datetime import timedelta
+
         cutoff_date = datetime.now() - timedelta(days=days)
 
         commits = []
@@ -437,14 +441,14 @@ def get_recent_changes_summary(days: int = 7) -> str:
 
         summary.append("\n## Recent Commits")
         for commit in commits[:10]:
-            date_str = datetime.fromtimestamp(commit.committed_date).strftime('%Y-%m-%d %H:%M')
-            message = commit.message.strip().split('\n')[0][:100]
+            date_str = datetime.fromtimestamp(commit.committed_date).strftime("%Y-%m-%d %H:%M")
+            message = commit.message.strip().split("\n")[0][:100]
             summary.append(f"- **{date_str}** [{commit.hexsha[:7]}]: {message}")
 
         if len(commits) > 10:
             summary.append(f"\n... and {len(commits) - 10} more commits")
 
-        return '\n'.join(summary)
+        return "\n".join(summary)
     except Exception as e:
         return f"Error analyzing changes: {e}"
 
@@ -466,7 +470,7 @@ def should_include_search_result(
     relevance: float,
     file_types: list[str] | None,
     exclude_dirs: list[str] | None,
-    min_relevance: float
+    min_relevance: float,
 ) -> bool:
     """
     Determines if a search result should be included based on filters.
@@ -548,7 +552,9 @@ def search_codebase_advanced(
 
                 relevance = 1 - (distance / 2)
 
-                if should_include_search_result(source, relevance, file_types, exclude_dirs, min_relevance):
+                if should_include_search_result(
+                    source, relevance, file_types, exclude_dirs, min_relevance
+                ):
                     output.append(format_search_result(source, doc, relevance))
 
                 if len(output) >= n_results:

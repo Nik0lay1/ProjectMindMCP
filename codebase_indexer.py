@@ -36,8 +36,7 @@ class CodebaseIndexer:
         """
         self.vector_store = vector_store
         self.text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=CHUNK_SIZE,
-            chunk_overlap=CHUNK_OVERLAP
+            chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP
         )
 
     def should_index_file(self, file_path: Path, ignore_patterns: set[str]) -> bool:
@@ -73,10 +72,7 @@ class CodebaseIndexer:
         return True
 
     def scan_indexable_files(
-        self,
-        root_dir: Path,
-        ignored_dirs: set[str],
-        ignore_patterns: set[str]
+        self, root_dir: Path, ignored_dirs: set[str], ignore_patterns: set[str]
     ) -> list[Path]:
         """
         Scans directory tree and returns list of indexable files.
@@ -101,11 +97,7 @@ class CodebaseIndexer:
 
         return indexable_files
 
-    def process_file_to_chunks(
-        self,
-        file_path: Path,
-        indexer: MemoryLimitedIndexer
-    ) -> bool:
+    def process_file_to_chunks(self, file_path: Path, indexer: MemoryLimitedIndexer) -> bool:
         """
         Processes a single file: reads, splits into chunks, adds to indexer.
 
@@ -125,9 +117,7 @@ class CodebaseIndexer:
 
             for i, chunk in enumerate(chunks):
                 indexer.add_chunk(
-                    chunk,
-                    {"source": str(file_path), "chunk_index": i},
-                    f"{file_path}_{i}"
+                    chunk, {"source": str(file_path), "chunk_index": i}, f"{file_path}_{i}"
                 )
 
             return True
@@ -139,10 +129,7 @@ class CodebaseIndexer:
             return False
 
     def process_file_with_metadata(
-        self,
-        file_path: Path,
-        indexer: MemoryLimitedIndexer,
-        metadata: IndexMetadata
+        self, file_path: Path, indexer: MemoryLimitedIndexer, metadata: IndexMetadata
     ) -> bool:
         """
         Processes a file and updates its metadata.
@@ -167,11 +154,7 @@ class CodebaseIndexer:
             return False
 
     def index_all(
-        self,
-        root_dir: Path,
-        ignored_dirs: set[str],
-        ignore_patterns: set[str],
-        force: bool = False
+        self, root_dir: Path, ignored_dirs: set[str], ignore_patterns: set[str], force: bool = False
     ) -> str:
         """
         Indexes entire codebase.
@@ -196,9 +179,7 @@ class CodebaseIndexer:
             for i in range(0, len(documents), BATCH_SIZE):
                 end = min(i + BATCH_SIZE, len(documents))
                 self.vector_store.upsert(
-                    documents=documents[i:end],
-                    metadatas=metadatas[i:end],
-                    ids=ids[i:end]
+                    documents=documents[i:end], metadatas=metadatas[i:end], ids=ids[i:end]
                 )
 
         max_memory = get_max_memory_bytes()
@@ -219,10 +200,7 @@ class CodebaseIndexer:
         return f"Indexed {file_count} files ({stats['total_chunks']} chunks in {stats['total_batches']} batches)."
 
     def index_changed(
-        self,
-        root_dir: Path,
-        ignored_dirs: set[str],
-        ignore_patterns: set[str]
+        self, root_dir: Path, ignored_dirs: set[str], ignore_patterns: set[str]
     ) -> str:
         """
         Indexes only changed files (incremental indexing).
@@ -248,15 +226,15 @@ class CodebaseIndexer:
             for i in range(0, len(documents), BATCH_SIZE):
                 end = min(i + BATCH_SIZE, len(documents))
                 self.vector_store.upsert(
-                    documents=documents[i:end],
-                    metadatas=metadatas[i:end],
-                    ids=ids[i:end]
+                    documents=documents[i:end], metadatas=metadatas[i:end], ids=ids[i:end]
                 )
 
         max_memory = get_max_memory_bytes()
         indexer = MemoryLimitedIndexer(max_memory, batch_upsert)
 
-        logger.info(f"Found {len(changed_files)} changed files (memory limit: {max_memory / 1024 / 1024:.0f} MB)...")
+        logger.info(
+            f"Found {len(changed_files)} changed files (memory limit: {max_memory / 1024 / 1024:.0f} MB)..."
+        )
         file_count = 0
 
         for file_path in changed_files:

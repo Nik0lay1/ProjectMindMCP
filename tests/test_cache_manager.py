@@ -92,7 +92,7 @@ class TestTTLCache(unittest.TestCase):
         self.assertEqual(cache.get("key1"), "value1")
         self.assertEqual(cache.get("key2"), "value2")
 
-    @patch('time.time')
+    @patch("time.time")
     def test_ttl_cache_expiration(self, mock_time):
         """Test that items expire after TTL"""
         cache = TTLCache(ttl_seconds=5, max_size=10)
@@ -117,7 +117,7 @@ class TestTTLCache(unittest.TestCase):
         stats = cache.get_stats()
         self.assertEqual(stats["size"], 2)
 
-    @patch('time.time')
+    @patch("time.time")
     def test_ttl_cache_cleanup_expired(self, mock_time):
         """Test manual cleanup of expired items"""
         cache = TTLCache(ttl_seconds=5, max_size=10)
@@ -159,7 +159,7 @@ class TestTTLCache(unittest.TestCase):
 
 
 class TestFileCache(unittest.TestCase):
-    @patch('pathlib.Path.stat')
+    @patch("pathlib.Path.stat")
     def test_file_cache_basic_operations(self, mock_stat):
         """Test basic file cache operations"""
         cache = FileCache(capacity=3)
@@ -174,7 +174,7 @@ class TestFileCache(unittest.TestCase):
         result = cache.get(file_path)
         self.assertEqual(result, "file content")
 
-    @patch('pathlib.Path.stat')
+    @patch("pathlib.Path.stat")
     def test_file_cache_invalidation_on_mtime_change(self, mock_stat):
         """Test that cache is invalidated when file is modified"""
         cache = FileCache(capacity=3)
@@ -191,7 +191,7 @@ class TestFileCache(unittest.TestCase):
         mock_stat_result.st_mtime = 124.45
         self.assertIsNone(cache.get(file_path))
 
-    @patch('pathlib.Path.stat')
+    @patch("pathlib.Path.stat")
     def test_file_cache_miss_on_stat_error(self, mock_stat):
         """Test that cache returns None on stat errors"""
         cache = FileCache(capacity=3)
@@ -203,7 +203,7 @@ class TestFileCache(unittest.TestCase):
 
         self.assertIsNone(result)
 
-    @patch('pathlib.Path.stat')
+    @patch("pathlib.Path.stat")
     def test_file_cache_stats(self, mock_stat):
         """Test file cache statistics"""
         cache = FileCache(capacity=3)
@@ -222,7 +222,7 @@ class TestFileCache(unittest.TestCase):
         self.assertEqual(stats["hits"], 1)
         self.assertEqual(stats["capacity"], 3)
 
-    @patch('pathlib.Path.stat')
+    @patch("pathlib.Path.stat")
     def test_file_cache_clear(self, mock_stat):
         """Test clearing file cache"""
         cache = FileCache(capacity=3)
@@ -238,5 +238,5 @@ class TestFileCache(unittest.TestCase):
         self.assertIsNone(cache.get(file_path))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

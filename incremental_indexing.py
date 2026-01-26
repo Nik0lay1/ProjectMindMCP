@@ -8,7 +8,7 @@ from pathlib import Path
 
 from config import INDEX_METADATA_FILE
 
-if sys.platform == 'win32':
+if sys.platform == "win32":
     import msvcrt
 else:
     import fcntl
@@ -20,7 +20,7 @@ def file_lock(file_handle):
     Cross-platform file locking context manager.
     Prevents concurrent writes to the same file.
     """
-    if sys.platform == 'win32':
+    if sys.platform == "win32":
         file_handle.seek(0)
         locked = False
         try:
@@ -54,18 +54,16 @@ def atomic_write(file_path: Path, content: str) -> None:
     file_path.parent.mkdir(parents=True, exist_ok=True)
 
     fd, temp_path = tempfile.mkstemp(
-        dir=file_path.parent,
-        prefix=f".{file_path.name}.",
-        suffix=".tmp"
+        dir=file_path.parent, prefix=f".{file_path.name}.", suffix=".tmp"
     )
 
     try:
-        with os.fdopen(fd, 'w', encoding='utf-8') as f:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(content)
             f.flush()
             os.fsync(f.fileno())
 
-        if sys.platform == 'win32':
+        if sys.platform == "win32":
             try:
                 if file_path.exists():
                     file_path.unlink()
@@ -102,6 +100,7 @@ class IndexMetadata:
         Uses temp file + rename to prevent corruption.
         """
         from logger import get_logger
+
         logger = get_logger()
 
         try:

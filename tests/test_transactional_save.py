@@ -23,7 +23,7 @@ def test_atomic_write():
         atomic_write(test_file, test_content)
 
         assert test_file.exists()
-        content = test_file.read_text(encoding='utf-8')
+        content = test_file.read_text(encoding="utf-8")
         assert content == test_content
 
         data = json.loads(content)
@@ -63,7 +63,9 @@ def test_atomic_write_rollback_on_error():
 
         import incremental_indexing
 
-        with patch.object(incremental_indexing.os, 'replace', side_effect=OSError("Simulated replace failure")):
+        with patch.object(
+            incremental_indexing.os, "replace", side_effect=OSError("Simulated replace failure")
+        ):
             try:
                 atomic_write(test_file, '{"new": true}')
                 print("  [FAIL] Should have raised error")
@@ -144,12 +146,14 @@ def test_concurrent_writes():
         total_successes = sum(count for _, count in results)
 
         assert test_file.exists()
-        content = test_file.read_text(encoding='utf-8')
+        content = test_file.read_text(encoding="utf-8")
         data = json.loads(content)
         assert "worker" in data
         assert "iteration" in data
 
-        print(f"  [OK] Concurrent writes handled safely ({total_successes} successful writes, file not corrupted)")
+        print(
+            f"  [OK] Concurrent writes handled safely ({total_successes} successful writes, file not corrupted)"
+        )
 
 
 def test_no_temp_files_left():
@@ -197,6 +201,7 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n[ERROR] Test failed with error: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
     finally:

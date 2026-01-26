@@ -197,5 +197,5 @@ class TestMemoryLimitedIndexer(unittest.TestCase):
         self.assertGreaterEqual(indexer.total_batches, 3)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

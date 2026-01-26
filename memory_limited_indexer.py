@@ -13,7 +13,11 @@ class MemoryLimitedIndexer:
     Automatically flushes batches when memory threshold is reached.
     """
 
-    def __init__(self, max_memory_bytes: int, batch_callback: Callable[[list[str], list[dict], list[str]], None]):
+    def __init__(
+        self,
+        max_memory_bytes: int,
+        batch_callback: Callable[[list[str], list[dict], list[str]], None],
+    ):
         """
         Args:
             max_memory_bytes: Maximum memory to use for buffering documents
@@ -52,9 +56,9 @@ class MemoryLimitedIndexer:
             doc_id: Unique document ID
         """
         chunk_size = (
-            self._estimate_size(document) +
-            self._estimate_size(metadata) +
-            self._estimate_size(doc_id)
+            self._estimate_size(document)
+            + self._estimate_size(metadata)
+            + self._estimate_size(doc_id)
         )
 
         if self.current_memory + chunk_size > self.max_memory_bytes and self.documents:
