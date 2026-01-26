@@ -29,13 +29,16 @@ from config import (
 )
 from incremental_indexing import IndexMetadata
 from memory_limited_indexer import MemoryLimitedIndexer
+from vector_store_manager import VectorStoreManager
+from memory_manager import MemoryManager
+from codebase_indexer import CodebaseIndexer
 from logger import setup_logger, get_logger
 
-chroma_client = None
-collection = None
-embedding_fn = None
-
 logger = setup_logger()
+
+vector_store = VectorStoreManager()
+memory_manager = MemoryManager()
+indexer = CodebaseIndexer(vector_store)
 
 
 def log(message: str) -> None:
@@ -107,36 +110,7 @@ startup_check()
 mcp = FastMCP("ProjectMind")
 
 
-def get_vector_store():
-    global chroma_client, collection, embedding_fn
 
-    if collection is not None:
-        return collection
-
-    log("Initializing Vector Store (this may take a few seconds)...")
-
-    import chromadb
-    from chromadb.utils import embedding_functions
-    from sentence_transformers import SentenceTransformer
-
-    class LocalSentenceTransformerEmbeddingFunction(embedding_functions.EmbeddingFunction):
-        def __init__(self, model_name: str) -> None:
-            self.model = SentenceTransformer(model_name)
-
-        def __call__(self, input: List[str]) -> List[List[float]]:
-            return self.model.encode(input).tolist()
-
-    try:
-        chroma_client = chromadb.PersistentClient(path=str(VECTOR_STORE_DIR))
-        embedding_fn = LocalSentenceTransformerEmbeddingFunction(MODEL_NAME)
-        collection = chroma_client.get_or_create_collection(
-            name="project_codebase", embedding_function=embedding_fn
-        )
-        logger.info("Vector Store initialized successfully")
-        return collection
-    except Exception as e:
-        logger.error(f"Failed to initialize ChromaDB: {e}", exc_info=True)
-        return None
 
 
 def load_index_ignore_patterns() -> Set[str]:
@@ -156,256 +130,44 @@ def load_index_ignore_patterns() -> Set[str]:
         return set()
 
 
-def should_index_file(file_path: Path, ignore_patterns: Set[str]) -> bool:
-    if file_path.suffix in BINARY_EXTENSIONS:
-        return False
 
-    if file_path.suffix and file_path.suffix not in INDEXABLE_EXTENSIONS:
-        return False
-
-    file_str = str(file_path)
-    for pattern in ignore_patterns:
-        if pattern in file_str:
-            return False
-
-    try:
-        file_size = file_path.stat().st_size
-        if file_size > get_max_file_size_bytes():
-            log(f"Skipping {file_path}: exceeds max file size")
-            return False
-    except Exception:
-        return False
-
-    return True
-
-
-def scan_indexable_files(root_dir: Path, ignored_dirs: Set[str], ignore_patterns: Set[str]) -> List[Path]:
-    """
-    Scans directory tree and returns list of indexable files.
-    
-    Args:
-        root_dir: Root directory to scan
-        ignored_dirs: Directories to skip
-        ignore_patterns: File patterns to ignore
-        
-    Returns:
-        List of indexable file paths
-    """
-    indexable_files = []
-    
-    for root, dirs, files in os.walk(root_dir):
-        dirs[:] = [d for d in dirs if d not in ignored_dirs]
-        
-        for file in files:
-            file_path = Path(root) / file
-            if should_index_file(file_path, ignore_patterns):
-                indexable_files.append(file_path)
-    
-    return indexable_files
-
-
-def process_file_to_chunks(
-    file_path: Path, 
-    text_splitter, 
-    indexer: MemoryLimitedIndexer
-) -> bool:
-    """
-    Processes a single file: reads, splits into chunks, adds to indexer.
-    
-    Args:
-        file_path: File to process
-        text_splitter: Text splitter for chunking
-        indexer: Memory-limited indexer to add chunks to
-        
-    Returns:
-        True if file was successfully processed, False otherwise
-    """
-    try:
-        content = safe_read_text(file_path)
-        if not content.strip():
-            return False
-        
-        chunks = text_splitter.split_text(content)
-        
-        for i, chunk in enumerate(chunks):
-            indexer.add_chunk(
-                chunk,
-                {"source": str(file_path), "chunk_index": i},
-                f"{file_path}_{i}"
-            )
-        
-        return True
-    except (UnicodeDecodeError, IOError) as e:
-        logger.warning(f"Skipping {file_path}: encoding error - {e}")
-        return False
-    except Exception as e:
-        logger.error(f"Unexpected error processing {file_path}: {e}", exc_info=True)
-        return False
-
-
-def clear_vector_store_collection() -> Optional[str]:
-    """
-    Clears existing vector store collection.
-    
-    Returns:
-        Error message if failed, None if successful
-    """
-    global chroma_client, collection, embedding_fn
-    
-    if not chroma_client:
-        return "ChromaDB client not initialized"
-    
-    try:
-        chroma_client.delete_collection("project_codebase")
-        collection = chroma_client.get_or_create_collection(
-            name="project_codebase", embedding_function=embedding_fn
-        )
-        return None
-    except Exception as e:
-        error_msg = f"Error clearing collection: {e}"
-        log(error_msg)
-        return error_msg
 
 
 @mcp.resource("project://memory")
 def get_project_memory() -> str:
-    if MEMORY_FILE.exists():
-        return MEMORY_FILE.read_text()
-    return "Memory file not found."
+    return memory_manager.read()
 
 
 @mcp.tool()
 def read_memory() -> str:
-    if MEMORY_FILE.exists():
-        return MEMORY_FILE.read_text()
-    return "Memory file not found."
+    return memory_manager.read()
 
 
 @mcp.tool()
 def update_memory(content: str, section: str = "Recent Decisions") -> str:
-    if not MEMORY_FILE.exists():
-        return "Memory file not found."
-
-    if not content or not content.strip():
-        return "Error: Content cannot be empty."
-
-    current_content = MEMORY_FILE.read_text()
-
-    new_entry = f"\n\n### Update ({section})\n{content}"
-
-    with open(MEMORY_FILE, "a") as f:
-        f.write(new_entry)
-
-    return "Memory updated successfully."
+    return memory_manager.update(content, section)
 
 
 @mcp.tool()
 def clear_memory(keep_template: bool = True) -> str:
-    if not MEMORY_FILE.exists():
-        return "Memory file not found."
-
-    try:
-        if keep_template:
-            template = """# Project Memory
-
-## Status
-- [ ] Initial Setup
-
-## Tech Stack
-- Language: Python
-- Framework: 
-
-## Recent Decisions
-- Memory cleared.
-"""
-            MEMORY_FILE.write_text(template)
-            return "Memory cleared (template preserved)."
-        else:
-            MEMORY_FILE.write_text("")
-            return "Memory completely cleared."
-    except Exception as e:
-        return f"Error clearing memory: {e}"
+    return memory_manager.clear(keep_template)
 
 
 @mcp.tool()
 def delete_memory_section(section_name: str) -> str:
-    if not MEMORY_FILE.exists():
-        return "Memory file not found."
-
-    if not section_name or not section_name.strip():
-        return "Error: Section name cannot be empty."
-
-    try:
-        content = MEMORY_FILE.read_text()
-        lines = content.split("\n")
-        new_lines = []
-        skip = False
-
-        for line in lines:
-            if line.startswith("##") and section_name.lower() in line.lower():
-                skip = True
-                continue
-            elif line.startswith("##") and skip:
-                skip = False
-
-            if not skip:
-                new_lines.append(line)
-
-        MEMORY_FILE.write_text("\n".join(new_lines))
-        return f"Section '{section_name}' deleted successfully."
-    except Exception as e:
-        return f"Error deleting section: {e}"
+    return memory_manager.delete_section(section_name)
 
 
 @mcp.tool()
 def index_codebase(force: bool = False) -> str:
-    from langchain_text_splitters import RecursiveCharacterTextSplitter
-
-    coll = get_vector_store()
-    if coll is None:
+    if vector_store.get_collection() is None:
         return "Failed to initialize vector store."
-
-    if force:
-        log("Clearing existing index...")
-        error = clear_vector_store_collection()
-        if error:
-            return error
-        coll = collection
-
+    
     root_dir = Path(".")
     ignored_dirs = get_ignored_dirs()
     ignore_patterns = load_index_ignore_patterns()
-
-    def batch_upsert(documents, metadatas, ids):
-        """Callback for flushing batches to ChromaDB"""
-        for i in range(0, len(documents), BATCH_SIZE):
-            end = min(i + BATCH_SIZE, len(documents))
-            collection.upsert(
-                documents=documents[i:end],
-                metadatas=metadatas[i:end],
-                ids=ids[i:end]
-            )
-
-    max_memory = get_max_memory_bytes()
-    indexer = MemoryLimitedIndexer(max_memory, batch_upsert)
-
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP
-    )
-
-    log(f"Scanning files (memory limit: {max_memory / 1024 / 1024:.0f} MB)...")
     
-    indexable_files = scan_indexable_files(root_dir, ignored_dirs, ignore_patterns)
-    file_count = 0
-
-    for file_path in indexable_files:
-        if process_file_to_chunks(file_path, text_splitter, indexer):
-            file_count += 1
-
-    indexer.flush()
-    
-    stats = indexer.get_stats()
-    return f"Indexed {file_count} files ({stats['total_chunks']} chunks in {stats['total_batches']} batches)."
+    return indexer.index_all(root_dir, ignored_dirs, ignore_patterns, force)
 
 
 @mcp.tool()
@@ -419,12 +181,11 @@ def search_codebase(query: str, n_results: int = 5) -> str:
     if n_results > 50:
         return "Error: n_results cannot exceed 50."
 
-    coll = get_vector_store()
-    if coll is None:
-        return "Vector store not initialized."
-
     try:
-        results = coll.query(query_texts=[query], n_results=n_results)
+        results = vector_store.query(query_texts=[query], n_results=n_results)
+        
+        if results is None:
+            return "Vector store not initialized."
 
         output = []
         if results["documents"]:
@@ -499,15 +260,10 @@ def ingest_git_history(limit: int = 30) -> str:
 
 @mcp.tool()
 def get_index_stats() -> str:
-    coll = get_vector_store()
-    if coll is None:
+    count = vector_store.get_count()
+    if count is None:
         return "Vector store not initialized."
-
-    try:
-        count = coll.count()
-        return f"Vector store contains {count} chunks."
-    except Exception as e:
-        return f"Error getting stats: {e}"
+    return f"Vector store contains {count} chunks."
 
 
 @mcp.tool()
@@ -708,88 +464,16 @@ def get_recent_changes_summary(days: int = 7) -> str:
         return f"Error analyzing changes: {e}"
 
 
-def process_file_with_metadata(
-    file_path: Path,
-    text_splitter,
-    indexer: MemoryLimitedIndexer,
-    metadata: IndexMetadata
-) -> bool:
-    """
-    Processes a file and updates its metadata.
-    
-    Args:
-        file_path: File to process
-        text_splitter: Text splitter for chunking
-        indexer: Memory-limited indexer
-        metadata: Index metadata to update
-        
-    Returns:
-        True if file was successfully processed
-    """
-    if not process_file_to_chunks(file_path, text_splitter, indexer):
-        return False
-    
-    try:
-        mtime = file_path.stat().st_mtime
-        metadata.update_file(str(file_path), mtime)
-        return True
-    except Exception as e:
-        logger.error(f"Error updating metadata for {file_path}: {e}")
-        return False
-
-
 @mcp.tool()
 def index_changed_files() -> str:
-    from langchain_text_splitters import RecursiveCharacterTextSplitter
-
-    coll = get_vector_store()
-    if coll is None:
+    if vector_store.get_collection() is None:
         return "Failed to initialize vector store."
-
-    metadata = IndexMetadata()
-
+    
     root_dir = Path(".")
     ignored_dirs = get_ignored_dirs()
     ignore_patterns = load_index_ignore_patterns()
-
-    all_files = scan_indexable_files(root_dir, ignored_dirs, ignore_patterns)
-    changed_files = metadata.get_changed_files(all_files)
-
-    if not changed_files:
-        return "No changed files to index."
-
-    def batch_upsert(documents, metadatas, ids):
-        """Callback for flushing batches to ChromaDB"""
-        for i in range(0, len(documents), BATCH_SIZE):
-            end = min(i + BATCH_SIZE, len(documents))
-            collection.upsert(
-                documents=documents[i:end],
-                metadatas=metadatas[i:end],
-                ids=ids[i:end]
-            )
-
-    max_memory = get_max_memory_bytes()
-    indexer = MemoryLimitedIndexer(max_memory, batch_upsert)
-
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP
-    )
-
-    log(f"Found {len(changed_files)} changed files (memory limit: {max_memory / 1024 / 1024:.0f} MB)...")
-    file_count = 0
-
-    for file_path in changed_files:
-        if process_file_with_metadata(file_path, text_splitter, indexer, metadata):
-            file_count += 1
-
-    indexer.flush()
-
-    existing_files = {str(f) for f in all_files}
-    metadata.remove_deleted_files(existing_files)
-    metadata.save()
-
-    stats = indexer.get_stats()
-    return f"Incrementally indexed {file_count} changed files ({stats['total_chunks']} chunks in {stats['total_batches']} batches)."
+    
+    return indexer.index_changed(root_dir, ignored_dirs, ignore_patterns)
 
 
 def should_include_search_result(
@@ -863,12 +547,11 @@ def search_codebase_advanced(
     if min_relevance < 0 or min_relevance > 1:
         return "Error: min_relevance must be between 0 and 1."
 
-    coll = get_vector_store()
-    if coll is None:
-        return "Vector store not initialized."
-
     try:
-        results = coll.query(query_texts=[query], n_results=n_results * 2)
+        results = vector_store.query(query_texts=[query], n_results=n_results * 2)
+        
+        if results is None:
+            return "Vector store not initialized."
 
         output = []
         if results["documents"]:
@@ -1119,84 +802,17 @@ def get_test_coverage_info() -> str:
 
 @mcp.tool()
 def save_memory_version(description: str = "") -> str:
-    if not MEMORY_FILE.exists():
-        return "Memory file not found"
-
-    try:
-        MEMORY_HISTORY_DIR.mkdir(parents=True, exist_ok=True)
-
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        version_file = MEMORY_HISTORY_DIR / f"memory_{timestamp}.md"
-
-        shutil.copy2(MEMORY_FILE, version_file)
-
-        metadata_file = MEMORY_HISTORY_DIR / f"memory_{timestamp}.meta.json"
-        metadata = {
-            "timestamp": timestamp,
-            "description": description,
-            "created_at": datetime.now().isoformat(),
-        }
-
-        with open(metadata_file, "w") as f:
-            json.dump(metadata, f, indent=2)
-
-        return f"Memory version saved: {version_file.name}"
-    except Exception as e:
-        return f"Error saving version: {e}"
+    return memory_manager.save_version(description)
 
 
 @mcp.tool()
 def list_memory_versions() -> str:
-    if not MEMORY_HISTORY_DIR.exists():
-        return "No memory versions found"
-
-    try:
-        versions = []
-        for meta_file in sorted(MEMORY_HISTORY_DIR.glob("*.meta.json"), reverse=True):
-            try:
-                with open(meta_file, "r") as f:
-                    meta = json.load(f)
-
-                timestamp = meta.get("timestamp", "unknown")
-                description = meta.get("description", "")
-                created = meta.get("created_at", "")
-
-                version_info = f"- **{timestamp}**"
-                if description:
-                    version_info += f": {description}"
-                if created:
-                    version_info += f" ({created})"
-
-                versions.append(version_info)
-            except Exception:
-                continue
-
-        if not versions:
-            return "No memory versions found"
-
-        return "# MEMORY VERSIONS\n\n" + "\n".join(versions)
-    except Exception as e:
-        return f"Error listing versions: {e}"
+    return memory_manager.list_versions()
 
 
 @mcp.tool()
 def restore_memory_version(timestamp: str) -> str:
-    if not MEMORY_HISTORY_DIR.exists():
-        return "No memory versions found"
-
-    try:
-        version_file = MEMORY_HISTORY_DIR / f"memory_{timestamp}.md"
-
-        if not version_file.exists():
-            return f"Version not found: {timestamp}"
-
-        save_memory_version(description="Auto-backup before restore")
-
-        shutil.copy2(version_file, MEMORY_FILE)
-
-        return f"Memory restored from version: {timestamp}"
-    except Exception as e:
-        return f"Error restoring version: {e}"
+    return memory_manager.restore_version(timestamp)
 
 
 if __name__ == "__main__":
