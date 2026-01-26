@@ -1,9 +1,85 @@
 import json
+import os
+import sys
+import tempfile
 from pathlib import Path
 from typing import Dict, List, Set
 from datetime import datetime
+from contextlib import contextmanager
 
 from config import INDEX_METADATA_FILE
+
+if sys.platform == 'win32':
+    import msvcrt
+else:
+    import fcntl
+
+
+@contextmanager
+def file_lock(file_handle):
+    """
+    Cross-platform file locking context manager.
+    Prevents concurrent writes to the same file.
+    """
+    if sys.platform == 'win32':
+        file_handle.seek(0)
+        locked = False
+        try:
+            msvcrt.locking(file_handle.fileno(), msvcrt.LK_NBLCK, 1)
+            locked = True
+            yield
+        finally:
+            if locked:
+                file_handle.seek(0)
+                msvcrt.locking(file_handle.fileno(), msvcrt.LK_UNLCK, 1)
+    else:
+        try:
+            fcntl.flock(file_handle.fileno(), fcntl.LOCK_EX)
+            yield
+        finally:
+            fcntl.flock(file_handle.fileno(), fcntl.LOCK_UN)
+
+
+def atomic_write(file_path: Path, content: str) -> None:
+    """
+    Atomically writes content to a file using temp file + rename.
+    Prevents partial writes and corruption.
+    
+    Args:
+        file_path: Target file path
+        content: Content to write
+        
+    Raises:
+        IOError: If write operation fails
+    """
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    fd, temp_path = tempfile.mkstemp(
+        dir=file_path.parent,
+        prefix=f".{file_path.name}.",
+        suffix=".tmp"
+    )
+    
+    try:
+        with os.fdopen(fd, 'w', encoding='utf-8') as f:
+            f.write(content)
+            f.flush()
+            os.fsync(f.fileno())
+        
+        if sys.platform == 'win32':
+            try:
+                if file_path.exists():
+                    file_path.unlink()
+            except FileNotFoundError:
+                pass
+        
+        os.replace(temp_path, file_path)
+    except Exception:
+        try:
+            os.unlink(temp_path)
+        except OSError:
+            pass
+        raise
 
 
 class IndexMetadata:
@@ -22,12 +98,20 @@ class IndexMetadata:
             self.metadata = {}
 
     def save(self) -> None:
+        """
+        Atomically saves metadata to disk with file locking.
+        Uses temp file + rename to prevent corruption.
+        """
+        from logger import get_logger
+        logger = get_logger()
+        
         try:
-            INDEX_METADATA_FILE.parent.mkdir(parents=True, exist_ok=True)
-            with open(INDEX_METADATA_FILE, "w") as f:
-                json.dump(self.metadata, f, indent=2)
+            content = json.dumps(self.metadata, indent=2)
+            atomic_write(INDEX_METADATA_FILE, content)
+            logger.debug(f"Metadata saved successfully: {len(self.metadata)} files tracked")
         except Exception as e:
-            print(f"Error saving metadata: {e}")
+            logger.error(f"Error saving metadata: {e}", exc_info=True)
+            raise
 
     def get_file_mtime(self, file_path: str) -> float:
         return self.metadata.get(file_path, {}).get("mtime", 0.0)
