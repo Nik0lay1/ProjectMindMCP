@@ -179,6 +179,94 @@ def should_index_file(file_path: Path, ignore_patterns: Set[str]) -> bool:
     return True
 
 
+def scan_indexable_files(root_dir: Path, ignored_dirs: Set[str], ignore_patterns: Set[str]) -> List[Path]:
+    """
+    Scans directory tree and returns list of indexable files.
+    
+    Args:
+        root_dir: Root directory to scan
+        ignored_dirs: Directories to skip
+        ignore_patterns: File patterns to ignore
+        
+    Returns:
+        List of indexable file paths
+    """
+    indexable_files = []
+    
+    for root, dirs, files in os.walk(root_dir):
+        dirs[:] = [d for d in dirs if d not in ignored_dirs]
+        
+        for file in files:
+            file_path = Path(root) / file
+            if should_index_file(file_path, ignore_patterns):
+                indexable_files.append(file_path)
+    
+    return indexable_files
+
+
+def process_file_to_chunks(
+    file_path: Path, 
+    text_splitter, 
+    indexer: MemoryLimitedIndexer
+) -> bool:
+    """
+    Processes a single file: reads, splits into chunks, adds to indexer.
+    
+    Args:
+        file_path: File to process
+        text_splitter: Text splitter for chunking
+        indexer: Memory-limited indexer to add chunks to
+        
+    Returns:
+        True if file was successfully processed, False otherwise
+    """
+    try:
+        content = safe_read_text(file_path)
+        if not content.strip():
+            return False
+        
+        chunks = text_splitter.split_text(content)
+        
+        for i, chunk in enumerate(chunks):
+            indexer.add_chunk(
+                chunk,
+                {"source": str(file_path), "chunk_index": i},
+                f"{file_path}_{i}"
+            )
+        
+        return True
+    except (UnicodeDecodeError, IOError) as e:
+        logger.warning(f"Skipping {file_path}: encoding error - {e}")
+        return False
+    except Exception as e:
+        logger.error(f"Unexpected error processing {file_path}: {e}", exc_info=True)
+        return False
+
+
+def clear_vector_store_collection() -> Optional[str]:
+    """
+    Clears existing vector store collection.
+    
+    Returns:
+        Error message if failed, None if successful
+    """
+    global chroma_client, collection, embedding_fn
+    
+    if not chroma_client:
+        return "ChromaDB client not initialized"
+    
+    try:
+        chroma_client.delete_collection("project_codebase")
+        collection = chroma_client.get_or_create_collection(
+            name="project_codebase", embedding_function=embedding_fn
+        )
+        return None
+    except Exception as e:
+        error_msg = f"Error clearing collection: {e}"
+        log(error_msg)
+        return error_msg
+
+
 @mcp.resource("project://memory")
 def get_project_memory() -> str:
     if MEMORY_FILE.exists():
@@ -279,17 +367,10 @@ def index_codebase(force: bool = False) -> str:
 
     if force:
         log("Clearing existing index...")
-        global chroma_client, collection, embedding_fn
-        if chroma_client:
-            try:
-                chroma_client.delete_collection("project_codebase")
-                collection = chroma_client.get_or_create_collection(
-                    name="project_codebase", embedding_function=embedding_fn
-                )
-                coll = collection
-            except Exception as e:
-                log(f"Error clearing collection: {e}")
-                return f"Error clearing collection: {e}"
+        error = clear_vector_store_collection()
+        if error:
+            return error
+        coll = collection
 
     root_dir = Path(".")
     ignored_dirs = get_ignored_dirs()
@@ -313,37 +394,13 @@ def index_codebase(force: bool = False) -> str:
     )
 
     log(f"Scanning files (memory limit: {max_memory / 1024 / 1024:.0f} MB)...")
+    
+    indexable_files = scan_indexable_files(root_dir, ignored_dirs, ignore_patterns)
     file_count = 0
 
-    for root, dirs, files in os.walk(root_dir):
-        dirs[:] = [d for d in dirs if d not in ignored_dirs]
-
-        for file in files:
-            file_path = Path(root) / file
-
-            if not should_index_file(file_path, ignore_patterns):
-                continue
-
-            try:
-                content = safe_read_text(file_path)
-                if not content.strip():
-                    continue
-
-                chunks = text_splitter.split_text(content)
-
-                for i, chunk in enumerate(chunks):
-                    indexer.add_chunk(
-                        chunk,
-                        {"source": str(file_path), "chunk_index": i},
-                        f"{file_path}_{i}"
-                    )
-
-                file_count += 1
-
-            except (UnicodeDecodeError, IOError) as e:
-                logger.warning(f"Skipping {file_path}: encoding error - {e}")
-            except Exception as e:
-                logger.error(f"Unexpected error indexing {file_path}: {e}", exc_info=True)
+    for file_path in indexable_files:
+        if process_file_to_chunks(file_path, text_splitter, indexer):
+            file_count += 1
 
     indexer.flush()
     
@@ -651,6 +708,36 @@ def get_recent_changes_summary(days: int = 7) -> str:
         return f"Error analyzing changes: {e}"
 
 
+def process_file_with_metadata(
+    file_path: Path,
+    text_splitter,
+    indexer: MemoryLimitedIndexer,
+    metadata: IndexMetadata
+) -> bool:
+    """
+    Processes a file and updates its metadata.
+    
+    Args:
+        file_path: File to process
+        text_splitter: Text splitter for chunking
+        indexer: Memory-limited indexer
+        metadata: Index metadata to update
+        
+    Returns:
+        True if file was successfully processed
+    """
+    if not process_file_to_chunks(file_path, text_splitter, indexer):
+        return False
+    
+    try:
+        mtime = file_path.stat().st_mtime
+        metadata.update_file(str(file_path), mtime)
+        return True
+    except Exception as e:
+        logger.error(f"Error updating metadata for {file_path}: {e}")
+        return False
+
+
 @mcp.tool()
 def index_changed_files() -> str:
     from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -665,14 +752,7 @@ def index_changed_files() -> str:
     ignored_dirs = get_ignored_dirs()
     ignore_patterns = load_index_ignore_patterns()
 
-    all_files = []
-    for root, dirs, files in os.walk(root_dir):
-        dirs[:] = [d for d in dirs if d not in ignored_dirs]
-        for file in files:
-            file_path = Path(root) / file
-            if should_index_file(file_path, ignore_patterns):
-                all_files.append(file_path)
-
+    all_files = scan_indexable_files(root_dir, ignored_dirs, ignore_patterns)
     changed_files = metadata.get_changed_files(all_files)
 
     if not changed_files:
@@ -699,29 +779,8 @@ def index_changed_files() -> str:
     file_count = 0
 
     for file_path in changed_files:
-        try:
-            content = safe_read_text(file_path)
-            if not content.strip():
-                continue
-
-            chunks = text_splitter.split_text(content)
-
-            for i, chunk in enumerate(chunks):
-                indexer.add_chunk(
-                    chunk,
-                    {"source": str(file_path), "chunk_index": i},
-                    f"{file_path}_{i}"
-                )
-
-            mtime = file_path.stat().st_mtime
-            metadata.update_file(str(file_path), mtime)
-
+        if process_file_with_metadata(file_path, text_splitter, indexer, metadata):
             file_count += 1
-
-        except (UnicodeDecodeError, IOError) as e:
-            logger.warning(f"Skipping {file_path}: encoding error - {e}")
-        except Exception as e:
-            logger.error(f"Unexpected error indexing changed file {file_path}: {e}", exc_info=True)
 
     indexer.flush()
 
@@ -731,6 +790,57 @@ def index_changed_files() -> str:
 
     stats = indexer.get_stats()
     return f"Incrementally indexed {file_count} changed files ({stats['total_chunks']} chunks in {stats['total_batches']} batches)."
+
+
+def should_include_search_result(
+    source: str,
+    relevance: float,
+    file_types: Optional[List[str]],
+    exclude_dirs: Optional[List[str]],
+    min_relevance: float
+) -> bool:
+    """
+    Determines if a search result should be included based on filters.
+    
+    Args:
+        source: File path of the result
+        relevance: Relevance score (0-1)
+        file_types: Allowed file extensions (None = all)
+        exclude_dirs: Directories to exclude (None = none)
+        min_relevance: Minimum relevance threshold
+        
+    Returns:
+        True if result passes all filters
+    """
+    if min_relevance > 0 and relevance < min_relevance:
+        return False
+    
+    if file_types:
+        file_ext = Path(source).suffix
+        if file_ext not in file_types:
+            return False
+    
+    if exclude_dirs:
+        for exc_dir in exclude_dirs:
+            if exc_dir in source:
+                return False
+    
+    return True
+
+
+def format_search_result(source: str, document: str, relevance: float) -> str:
+    """
+    Formats a single search result for display.
+    
+    Args:
+        source: Source file path
+        document: Document content
+        relevance: Relevance score
+        
+    Returns:
+        Formatted result string
+    """
+    return f"--- {source} (relevance: {relevance:.2f}) ---\n{document}\n"
 
 
 @mcp.tool()
@@ -770,25 +880,9 @@ def search_codebase_advanced(
 
                 relevance = 1 - (distance / 2)
 
-                if min_relevance > 0 and relevance < min_relevance:
-                    continue
-
-                if file_types:
-                    file_ext = Path(source).suffix
-                    if file_ext not in file_types:
-                        continue
-
-                if exclude_dirs:
-                    skip = False
-                    for exc_dir in exclude_dirs:
-                        if exc_dir in source:
-                            skip = True
-                            break
-                    if skip:
-                        continue
-
-                output.append(f"--- {source} (relevance: {relevance:.2f}) ---\n{doc}\n")
-
+                if should_include_search_result(source, relevance, file_types, exclude_dirs, min_relevance):
+                    output.append(format_search_result(source, doc, relevance))
+                
                 if len(output) >= n_results:
                     break
 
