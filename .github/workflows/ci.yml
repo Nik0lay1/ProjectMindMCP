@@ -41,10 +41,26 @@ jobs:
       run: black --check .
 
     - name: Run mypy
-      run: mypy mcp_server.py config.py --ignore-missing-imports
+      run: |
+        mypy mcp_server.py config.py logger.py incremental_indexing.py memory_limited_indexer.py --ignore-missing-imports
       continue-on-error: true
 
-    - name: Run tests
+    - name: Run security tests
+      run: python test_path_validation.py
+
+    - name: Run Unicode tests
+      run: python test_unicode_handling.py
+
+    - name: Run logging tests
+      run: python test_logging.py
+
+    - name: Run transactional save tests
+      run: python test_transactional_save.py
+
+    - name: Run memory limit tests
+      run: python test_memory_limits.py
+
+    - name: Run integration tests
       run: python test_mcp_tools.py
 
   security:
@@ -61,5 +77,6 @@ jobs:
       run: pip install bandit
 
     - name: Run security check
-      run: bandit -r mcp_server.py config.py -ll
+      run: |
+        bandit -r mcp_server.py config.py logger.py incremental_indexing.py memory_limited_indexer.py -ll
       continue-on-error: true
