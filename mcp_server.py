@@ -3,7 +3,7 @@ import sys
 import json
 import shutil
 from pathlib import Path
-from typing import List, Optional, Set, Dict
+from typing import Optional, Set, Dict
 from mcp.server.fastmcp import FastMCP
 import git
 from datetime import datetime, timedelta
@@ -95,7 +95,7 @@ def startup_check() -> None:
 
 ## Tech Stack
 - Language: Python
-- Framework: 
+- Framework:
 
 ## Recent Decisions
 - Project initialized.
@@ -163,11 +163,11 @@ def delete_memory_section(section_name: str) -> str:
 def index_codebase(force: bool = False) -> str:
     if vector_store.get_collection() is None:
         return "Failed to initialize vector store."
-    
+
     root_dir = Path(".")
     ignored_dirs = get_ignored_dirs()
     ignore_patterns = load_index_ignore_patterns()
-    
+
     return indexer.index_all(root_dir, ignored_dirs, ignore_patterns, force)
 
 
@@ -184,7 +184,7 @@ def search_codebase(query: str, n_results: int = 5) -> str:
 
     try:
         results = vector_store.query(query_texts=[query], n_results=n_results)
-        
+
         if results is None:
             return "Vector store not initialized."
 
@@ -271,9 +271,9 @@ def get_index_stats() -> str:
 def generate_project_summary() -> str:
     try:
         summary_parts = []
-        
+
         summary_parts.append("# PROJECT SUMMARY\n")
-        
+
         memory = read_memory()
         if memory and "Memory file not found" not in memory:
             summary_parts.append("## Current Memory State")
@@ -281,7 +281,7 @@ def generate_project_summary() -> str:
             summary_parts.append('\n'.join(lines))
             if len(memory.split('\n')) > 30:
                 summary_parts.append("\n... (truncated, see full memory)\n")
-        
+
         try:
             repo = git.Repo(os.getcwd(), search_parent_directories=True)
             commits = list(repo.iter_commits(max_count=5))
@@ -293,18 +293,18 @@ def generate_project_summary() -> str:
                     summary_parts.append(f"- {date_str}: {message}")
         except Exception:
             pass
-        
+
         root = Path(".")
         py_files = len(list(root.rglob("*.py")))
         js_files = len(list(root.rglob("*.js"))) + len(list(root.rglob("*.ts")))
-        
+
         summary_parts.append("\n## Codebase Stats")
         summary_parts.append(f"- Python files: {py_files}")
         summary_parts.append(f"- JavaScript/TypeScript files: {js_files}")
-        
+
         stats = get_index_stats()
         summary_parts.append(f"- {stats}")
-        
+
         return '\n'.join(summary_parts)
     except Exception as e:
         return f"Error generating summary: {e}"
@@ -314,7 +314,7 @@ def generate_project_summary() -> str:
 def extract_tech_stack() -> str:
     try:
         tech_stack = []
-        
+
         if Path("pyproject.toml").exists():
             content = Path("pyproject.toml").read_text()
             tech_stack.append("## Python Project")
@@ -331,7 +331,7 @@ def extract_tech_stack() -> str:
                             break
                         if '"' in line:
                             tech_stack.append(f"- {line.strip()}")
-        
+
         elif Path("requirements.txt").exists():
             content = Path("requirements.txt").read_text()
             tech_stack.append("## Python Project")
@@ -339,7 +339,7 @@ def extract_tech_stack() -> str:
             for line in content.split('\n'):
                 if line.strip() and not line.startswith('#'):
                     tech_stack.append(f"- {line.strip()}")
-        
+
         if Path("package.json").exists():
             import json
             with open("package.json") as f:
@@ -351,16 +351,16 @@ def extract_tech_stack() -> str:
                     tech_stack.append(f"- {dep}: {ver}")
                 if len(data["dependencies"]) > 15:
                     tech_stack.append(f"... and {len(data['dependencies']) - 15} more")
-        
+
         if Path("Cargo.toml").exists():
             tech_stack.append("\n## Rust Project")
-        
+
         if Path("go.mod").exists():
             tech_stack.append("\n## Go Project")
-        
+
         if not tech_stack:
             return "No standard dependency files found (pyproject.toml, package.json, etc.)"
-        
+
         return '\n'.join(tech_stack)
     except Exception as e:
         return f"Error extracting tech stack: {e}"
@@ -371,43 +371,43 @@ def analyze_project_structure() -> str:
     try:
         root = Path(".")
         ignored_dirs = get_ignored_dirs()
-        
+
         structure = []
         structure.append("# PROJECT STRUCTURE\n")
-        
+
         dirs_by_depth = {}
         for item in root.iterdir():
             if item.is_dir() and item.name not in ignored_dirs:
                 dirs_by_depth[item.name] = len(list(item.rglob("*")))
-        
+
         sorted_dirs = sorted(dirs_by_depth.items(), key=lambda x: x[1], reverse=True)[:10]
-        
+
         structure.append("## Main Directories (by size)")
         for dir_name, count in sorted_dirs:
             structure.append(f"- `{dir_name}/` ({count} items)")
-        
+
         file_types = {}
         for ext in ['.py', '.js', '.ts', '.jsx', '.tsx', '.go', '.rs', '.java', '.c', '.cpp']:
             count = len(list(root.rglob(f"*{ext}")))
             if count > 0:
                 file_types[ext] = count
-        
+
         if file_types:
             structure.append("\n## File Types")
             for ext, count in sorted(file_types.items(), key=lambda x: x[1], reverse=True):
                 structure.append(f"- `{ext}`: {count} files")
-        
+
         config_files = []
-        for cfg in ['pyproject.toml', 'package.json', 'Cargo.toml', 'go.mod', 
+        for cfg in ['pyproject.toml', 'package.json', 'Cargo.toml', 'go.mod',
                     '.gitignore', 'docker-compose.yml', 'Dockerfile', '.env.example']:
             if Path(cfg).exists():
                 config_files.append(cfg)
-        
+
         if config_files:
             structure.append("\n## Configuration Files")
             for cfg in config_files:
                 structure.append(f"- {cfg}")
-        
+
         return '\n'.join(structure)
     except Exception as e:
         return f"Error analyzing structure: {e}"
@@ -417,49 +417,49 @@ def analyze_project_structure() -> str:
 def get_recent_changes_summary(days: int = 7) -> str:
     if days <= 0 or days > 365:
         return "Error: days must be between 1 and 365"
-    
+
     try:
         repo = git.Repo(os.getcwd(), search_parent_directories=True)
     except git.InvalidGitRepositoryError:
         return "Not a git repository"
     except Exception as e:
         return f"Error accessing git: {e}"
-    
+
     try:
         from datetime import timedelta
         cutoff_date = datetime.now() - timedelta(days=days)
-        
+
         commits = []
         for commit in repo.iter_commits(max_count=100):
             commit_date = datetime.fromtimestamp(commit.committed_date)
             if commit_date < cutoff_date:
                 break
             commits.append(commit)
-        
+
         if not commits:
             return f"No commits found in the last {days} days"
-        
+
         summary = [f"# CHANGES IN LAST {days} DAYS\n"]
         summary.append(f"Total commits: {len(commits)}\n")
-        
+
         authors = {}
         for commit in commits:
             author = commit.author.name
             authors[author] = authors.get(author, 0) + 1
-        
+
         summary.append("## Contributors")
         for author, count in sorted(authors.items(), key=lambda x: x[1], reverse=True):
             summary.append(f"- {author}: {count} commits")
-        
+
         summary.append("\n## Recent Commits")
         for commit in commits[:10]:
             date_str = datetime.fromtimestamp(commit.committed_date).strftime('%Y-%m-%d %H:%M')
             message = commit.message.strip().split('\n')[0][:100]
             summary.append(f"- **{date_str}** [{commit.hexsha[:7]}]: {message}")
-        
+
         if len(commits) > 10:
             summary.append(f"\n... and {len(commits) - 10} more commits")
-        
+
         return '\n'.join(summary)
     except Exception as e:
         return f"Error analyzing changes: {e}"
@@ -469,59 +469,59 @@ def get_recent_changes_summary(days: int = 7) -> str:
 def index_changed_files() -> str:
     if vector_store.get_collection() is None:
         return "Failed to initialize vector store."
-    
+
     root_dir = Path(".")
     ignored_dirs = get_ignored_dirs()
     ignore_patterns = load_index_ignore_patterns()
-    
+
     return indexer.index_changed(root_dir, ignored_dirs, ignore_patterns)
 
 
 def should_include_search_result(
     source: str,
     relevance: float,
-    file_types: Optional[List[str]],
-    exclude_dirs: Optional[List[str]],
+    file_types: Optional[list[str]],
+    exclude_dirs: Optional[list[str]],
     min_relevance: float
 ) -> bool:
     """
     Determines if a search result should be included based on filters.
-    
+
     Args:
         source: File path of the result
         relevance: Relevance score (0-1)
         file_types: Allowed file extensions (None = all)
         exclude_dirs: Directories to exclude (None = none)
         min_relevance: Minimum relevance threshold
-        
+
     Returns:
         True if result passes all filters
     """
     if min_relevance > 0 and relevance < min_relevance:
         return False
-    
+
     if file_types:
         file_ext = Path(source).suffix
         if file_ext not in file_types:
             return False
-    
+
     if exclude_dirs:
         for exc_dir in exclude_dirs:
             if exc_dir in source:
                 return False
-    
+
     return True
 
 
 def format_search_result(source: str, document: str, relevance: float) -> str:
     """
     Formats a single search result for display.
-    
+
     Args:
         source: Source file path
         document: Document content
         relevance: Relevance score
-        
+
     Returns:
         Formatted result string
     """
@@ -532,8 +532,8 @@ def format_search_result(source: str, document: str, relevance: float) -> str:
 def search_codebase_advanced(
     query: str,
     n_results: int = 5,
-    file_types: Optional[List[str]] = None,
-    exclude_dirs: Optional[List[str]] = None,
+    file_types: Optional[list[str]] = None,
+    exclude_dirs: Optional[list[str]] = None,
     min_relevance: float = 0.0,
 ) -> str:
     if not query or not query.strip():
@@ -550,7 +550,7 @@ def search_codebase_advanced(
 
     try:
         results = vector_store.query(query_texts=[query], n_results=n_results * 2)
-        
+
         if results is None:
             return "Vector store not initialized."
 
@@ -566,7 +566,7 @@ def search_codebase_advanced(
 
                 if should_include_search_result(source, relevance, file_types, exclude_dirs, min_relevance):
                     output.append(format_search_result(source, doc, relevance))
-                
+
                 if len(output) >= n_results:
                     break
 
@@ -638,7 +638,7 @@ def analyze_code_complexity(target_path: str = ".") -> str:
         from radon.metrics import mi_visit
     except ImportError:
         return "Error: radon not installed. Run: pip install radon"
-    
+
     try:
         target = validate_path(target_path)
         if not target.exists():
@@ -699,7 +699,7 @@ def analyze_code_quality(target_path: str = ".", max_files: int = 10) -> str:
         from io import StringIO
     except ImportError:
         return "Error: pylint not installed. Run: pip install pylint"
-    
+
     try:
         target = validate_path(target_path)
         if not target.exists():
@@ -820,20 +820,20 @@ def restore_memory_version(timestamp: str) -> str:
 def get_cache_stats() -> str:
     """
     Returns performance statistics for all caches.
-    
+
     Returns:
         Formatted string with cache statistics
     """
     file_stats = get_file_cache_stats()
     query_stats = vector_store.get_query_cache_stats()
-    
+
     result = "# CACHE STATISTICS\n\n"
     result += "## File Cache (safe_read_text)\n"
     result += f"- **Hits**: {file_stats['hits']}\n"
     result += f"- **Misses**: {file_stats['misses']}\n"
     result += f"- **Hit Rate**: {file_stats['hit_rate']}\n"
     result += f"- **Size**: {file_stats['size']}/{file_stats['capacity']}\n\n"
-    
+
     result += "## Query Cache (vector search)\n"
     result += f"- **Hits**: {query_stats['hits']}\n"
     result += f"- **Misses**: {query_stats['misses']}\n"
@@ -841,7 +841,7 @@ def get_cache_stats() -> str:
     result += f"- **Size**: {query_stats['size']}/{query_stats['max_size']}\n"
     result += f"- **Expirations**: {query_stats['expirations']}\n"
     result += f"- **TTL**: {query_stats['ttl_seconds']}s\n"
-    
+
     return result
 
 

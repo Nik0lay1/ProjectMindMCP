@@ -3,7 +3,7 @@ import os
 import sys
 import tempfile
 from pathlib import Path
-from typing import Dict, List, Set
+from typing import Dict, Set
 from datetime import datetime
 from contextlib import contextmanager
 
@@ -44,35 +44,35 @@ def atomic_write(file_path: Path, content: str) -> None:
     """
     Atomically writes content to a file using temp file + rename.
     Prevents partial writes and corruption.
-    
+
     Args:
         file_path: Target file path
         content: Content to write
-        
+
     Raises:
         IOError: If write operation fails
     """
     file_path.parent.mkdir(parents=True, exist_ok=True)
-    
+
     fd, temp_path = tempfile.mkstemp(
         dir=file_path.parent,
         prefix=f".{file_path.name}.",
         suffix=".tmp"
     )
-    
+
     try:
         with os.fdopen(fd, 'w', encoding='utf-8') as f:
             f.write(content)
             f.flush()
             os.fsync(f.fileno())
-        
+
         if sys.platform == 'win32':
             try:
                 if file_path.exists():
                     file_path.unlink()
             except FileNotFoundError:
                 pass
-        
+
         os.replace(temp_path, file_path)
     except Exception:
         try:
@@ -104,7 +104,7 @@ class IndexMetadata:
         """
         from logger import get_logger
         logger = get_logger()
-        
+
         try:
             content = json.dumps(self.metadata, indent=2)
             atomic_write(INDEX_METADATA_FILE, content)
@@ -122,7 +122,7 @@ class IndexMetadata:
             "indexed_at": datetime.now().isoformat(),
         }
 
-    def get_changed_files(self, all_files: List[Path]) -> List[Path]:
+    def get_changed_files(self, all_files: list[Path]) -> list[Path]:
         changed_files = []
 
         for file_path in all_files:

@@ -7,7 +7,7 @@ import sys
 
 def test_mcp_server():
     """Test basic MCP server communication"""
-    
+
     # Start server
     process = subprocess.Popen(
         [".venv/bin/python", "mcp_server.py"],
@@ -17,7 +17,7 @@ def test_mcp_server():
         text=True,
         bufsize=0
     )
-    
+
     try:
         # Send initialize request
         initialize_request = {
@@ -33,21 +33,21 @@ def test_mcp_server():
                 }
             }
         }
-        
+
         print("Sending initialize request...")
         request_str = json.dumps(initialize_request) + "\n"
         process.stdin.write(request_str)
         process.stdin.flush()
-        
+
         # Read response
         print("Waiting for response...")
         response_line = process.stdout.readline()
         print(f"Response: {response_line}")
-        
+
         if response_line:
             response = json.loads(response_line)
             print(f"Parsed response: {json.dumps(response, indent=2)}")
-            
+
             if "result" in response:
                 print("\n✅ Server responded successfully!")
                 print(f"Server capabilities: {response['result'].get('capabilities', {})}")
@@ -61,7 +61,7 @@ def test_mcp_server():
             if stderr:
                 print(f"Server stderr: {stderr}")
             return False
-            
+
     except Exception as e:
         print(f"\n❌ Error: {e}")
         stderr = process.stderr.read()

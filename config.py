@@ -159,28 +159,28 @@ def validate_path(path: str) -> Path:
     """
     Validates that a path is within the project root directory.
     Prevents path traversal attacks.
-    
+
     Args:
         path: Path string to validate
-        
+
     Returns:
         Resolved Path object
-        
+
     Raises:
         ValueError: If path is outside project root or invalid
     """
     try:
         if not path or not isinstance(path, str):
             raise ValueError("Path must be a non-empty string")
-        
+
         target_path = Path(path).resolve()
-        
+
         if not target_path.is_relative_to(PROJECT_ROOT):
             raise ValueError(
                 f"Path '{path}' is outside project root. "
                 f"Only paths within {PROJECT_ROOT} are allowed."
             )
-        
+
         return target_path
     except (OSError, RuntimeError) as e:
         raise ValueError(f"Invalid path '{path}': {e}")
@@ -191,13 +191,13 @@ def safe_read_text(file_path: Path) -> str:
     Safely reads text file with automatic encoding detection.
     Tries multiple encodings instead of ignoring errors.
     Uses FileCache for improved performance.
-    
+
     Args:
         file_path: Path to the file to read
-        
+
     Returns:
         File content as string
-        
+
     Raises:
         UnicodeDecodeError: If file cannot be decoded with any supported encoding
         IOError: If file cannot be read
@@ -206,13 +206,13 @@ def safe_read_text(file_path: Path) -> str:
     if _file_cache is None:
         from cache_manager import FileCache
         _file_cache = FileCache(capacity=50)
-    
+
     cached_content = _file_cache.get(file_path)
     if cached_content is not None:
         return cached_content
-    
+
     encodings = ['utf-8', 'utf-8-sig', 'latin-1', 'cp1252', 'iso-8859-1']
-    
+
     for encoding in encodings:
         try:
             content = file_path.read_text(encoding=encoding)
@@ -222,7 +222,7 @@ def safe_read_text(file_path: Path) -> str:
             continue
         except Exception as e:
             raise IOError(f"Error reading file {file_path}: {e}")
-    
+
     raise UnicodeDecodeError(
         'multi-encoding',
         b'',
@@ -235,7 +235,7 @@ def safe_read_text(file_path: Path) -> str:
 def get_file_cache_stats():
     """
     Returns file cache statistics.
-    
+
     Returns:
         Dictionary with cache statistics
     """
