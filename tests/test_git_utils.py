@@ -152,8 +152,7 @@ class TestGitRepository:
     def test_format_commits_summary_truncation(self):
         """Test commit summary truncation."""
         commits = [
-            CommitInfo("a", f"h{i}", f"Commit {i}", "Author", datetime.now())
-            for i in range(15)
+            CommitInfo("a", f"h{i}", f"Commit {i}", "Author", datetime.now()) for i in range(15)
         ]
 
         repo = GitRepository.__new__(GitRepository)

@@ -43,9 +43,7 @@ class StructuredFormatter(logging.Formatter):
         base = super().format(record)
 
         extra = {
-            key: value
-            for key, value in record.__dict__.items()
-            if key not in self.RESERVED_ATTRS
+            key: value for key, value in record.__dict__.items() if key not in self.RESERVED_ATTRS
         }
 
         if extra:

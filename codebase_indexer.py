@@ -50,9 +50,7 @@ class CodebaseIndexer:
             Callback function for MemoryLimitedIndexer
         """
 
-        def batch_upsert(
-            documents: list[str], metadatas: list[dict], ids: list[str]
-        ) -> None:
+        def batch_upsert(documents: list[str], metadatas: list[dict], ids: list[str]) -> None:
             for i in range(0, len(documents), BATCH_SIZE):
                 end = min(i + BATCH_SIZE, len(documents))
                 self.vector_store.upsert(

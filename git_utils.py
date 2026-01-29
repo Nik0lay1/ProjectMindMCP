@@ -62,9 +62,7 @@ class GitRepository:
                 raise GitError(f"Error accessing git repository: {e}") from e
         return self._repo
 
-    def get_commits(
-        self, max_count: int = 30, since_days: int | None = None
-    ) -> list[CommitInfo]:
+    def get_commits(self, max_count: int = 30, since_days: int | None = None) -> list[CommitInfo]:
         repo = self._get_repo()
         commits = []
 
@@ -80,9 +78,7 @@ class GitRepository:
 
         return commits
 
-    def get_commits_by_author(
-        self, commits: list[CommitInfo]
-    ) -> dict[str, list[CommitInfo]]:
+    def get_commits_by_author(self, commits: list[CommitInfo]) -> dict[str, list[CommitInfo]]:
         authors: dict[str, list[CommitInfo]] = {}
         for commit in commits:
             if commit.author not in authors:
@@ -96,14 +92,10 @@ class GitRepository:
             stats[commit.author] = stats.get(commit.author, 0) + 1
         return dict(sorted(stats.items(), key=lambda x: x[1], reverse=True))
 
-    def format_commits_summary(
-        self, commits: list[CommitInfo], max_display: int = 10
-    ) -> list[str]:
+    def format_commits_summary(self, commits: list[CommitInfo], max_display: int = 10) -> list[str]:
         lines = []
         for commit in commits[:max_display]:
-            lines.append(
-                f"- **{commit.date_str}** [{commit.short_hash}]: {commit.first_line}"
-            )
+            lines.append(f"- **{commit.date_str}** [{commit.short_hash}]: {commit.first_line}")
         if len(commits) > max_display:
             lines.append(f"\n... and {len(commits) - max_display} more commits")
         return lines
