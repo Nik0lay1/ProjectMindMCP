@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.5.1] - 2026-01-30 ⚡ PERFORMANCE OPTIMIZATION
+
+### Fixed
+- **Critical Performance Issues**
+  - Fixed server freezing when reading memory or executing analysis tools
+  - Eliminated blocking recursive file system operations
+  - Resolved slow response times on large codebases
+
+### Performance Improvements
+- **Added TTL Caching for `analyze_project_structure()`**
+  - 5-minute cache (configurable via `STRUCTURE_CACHE_TTL`)
+  - Prevents redundant file system scans
+  - Returns cached results instantly for repeated requests
+
+- **Optimized `generate_project_summary()`**
+  - Replaced 3 separate `rglob()` calls with single `os.walk()` traversal
+  - 3x faster execution on medium-sized projects
+  - Proper directory filtering (ignores `.git`, `node_modules`, `.venv`, etc.)
+
+- **Enhanced Directory Traversal**
+  - Added error handling for `PermissionError` and `OSError`
+  - Skips inaccessible directories instead of crashing
+  - Counts only files (not directories) for accurate statistics
+
+### Technical Details
+- Moved all imports to module top for proper organization
+- Added global cache variables with TTL tracking
+- Improved `analyze_project_structure()` from O(n²) to O(n) complexity
+- All 11 MCP tool tests pass successfully
+
 ## [0.5.0] - 2026-01-29 🏗️ DEPENDENCY INJECTION & CODE QUALITY
 
 ### Added

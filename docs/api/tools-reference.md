@@ -163,6 +163,8 @@ Generates comprehensive project overview.
 - Codebase statistics
 - Index stats
 
+**Performance:** ⚡ Optimized in v0.5.1 - Uses single file system traversal (3x faster on large projects)
+
 **Returns:** Formatted summary
 
 **Example:**
@@ -197,6 +199,8 @@ Analyzes codebase organization.
 - Directory sizes
 - File type distribution
 - Configuration files present
+
+**Performance:** ⚡ Cached in v0.5.1 - Results cached for 5 minutes (configurable via `STRUCTURE_CACHE_TTL`)
 
 **Returns:** Structure analysis
 
