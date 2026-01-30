@@ -277,9 +277,9 @@ def generate_project_summary() -> str:
         for _root_path, dirs, files in os.walk(root):
             dirs[:] = [d for d in dirs if d not in ignored_dirs]
             for file in files:
-                if file.endswith('.py'):
+                if file.endswith(".py"):
                     py_files += 1
-                elif file.endswith(('.js', '.ts')):
+                elif file.endswith((".js", ".ts")):
                     js_files += 1
 
         summary_parts.append("\n## Codebase Stats")
@@ -355,6 +355,7 @@ _structure_cache = None
 _structure_cache_time = 0
 STRUCTURE_CACHE_TTL = 300
 
+
 @mcp.tool()
 def analyze_project_structure() -> str:
     global _structure_cache, _structure_cache_time
@@ -391,7 +392,18 @@ def analyze_project_structure() -> str:
 
             for file in files:
                 ext = Path(file).suffix
-                if ext in [".py", ".js", ".ts", ".jsx", ".tsx", ".go", ".rs", ".java", ".c", ".cpp"]:
+                if ext in [
+                    ".py",
+                    ".js",
+                    ".ts",
+                    ".jsx",
+                    ".tsx",
+                    ".go",
+                    ".rs",
+                    ".java",
+                    ".c",
+                    ".cpp",
+                ]:
                     file_types[ext] = file_types.get(ext, 0) + 1
 
         if file_types:
