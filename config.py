@@ -33,16 +33,16 @@ def find_project_root() -> Path:
     # Strategy 3: Search upward for project markers
     current = Path.cwd().resolve()
     project_markers = [
-        ".git",           # Git repository
-        ".ai",            # ProjectMind directory
-        "package.json",   # Node.js project
-        "pyproject.toml", # Python project
-        "Cargo.toml",     # Rust project
-        "go.mod",         # Go project
-        "pom.xml",        # Maven project
-        "build.gradle",   # Gradle project
-        ".project",       # Eclipse project
-        ".vscode",        # VS Code workspace
+        ".git",  # Git repository
+        ".ai",  # ProjectMind directory
+        "package.json",  # Node.js project
+        "pyproject.toml",  # Python project
+        "Cargo.toml",  # Rust project
+        "go.mod",  # Go project
+        "pom.xml",  # Maven project
+        "build.gradle",  # Gradle project
+        ".project",  # Eclipse project
+        ".vscode",  # VS Code workspace
     ]
 
     # Search up to 10 levels up
