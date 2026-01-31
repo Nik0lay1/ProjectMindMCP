@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.5.2] - 2026-01-31 🚀 LAZY INITIALIZATION FIX
+
+### Fixed
+- **Critical: Eliminated Unnecessary Vector Store Initialization**
+  - Fixed `get_index_stats()` triggering 30-60 second model loading
+  - Fixed server freezing on parallel `read_memory()` + `get_index_stats()` calls
+  - `VectorStoreManager.get_count()` no longer forces initialization
+  - Added explicit initialization check before accessing collection
+
+### Performance Improvements
+- **Lazy Loading for Vector Store**
+  - Vector store only initializes when actually needed (indexing/search)
+  - `read_memory()` and `get_index_stats()` return instantly if not initialized
+  - SentenceTransformer model (80MB) loads only on first index/search operation
+  
+### Technical Details
+- Modified `VectorStoreManager.get_count()` to check `_initialized` flag
+- Added early return in `get_index_stats()` before accessing collection
+- Added diagnostic logging for initialization timing
+- All functionality remains unchanged, only initialization is optimized
+
 ## [0.5.1] - 2026-01-30 ⚡ PERFORMANCE OPTIMIZATION
 
 ### Fixed

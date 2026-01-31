@@ -39,6 +39,8 @@ ProjectMind is a standalone MCP server that adds persistent memory and local vec
   - Version history tracking
 - **🆕 Performance Caching & Optimization** (v0.4.0+):
   - Multi-layer caching system (LRU, TTL, File caches)
+  - **🔥 NEW (v0.5.2)**: Lazy vector store initialization (30-60s faster startup)
+  - **🔥 NEW (v0.5.2)**: Fixed freezing on parallel memory reads
   - **🔥 NEW (v0.5.1)**: Structure analysis caching (5-minute TTL)
   - **🔥 NEW (v0.5.1)**: Optimized file system traversal (3x faster on large projects)
   - Reduced disk I/O for file operations

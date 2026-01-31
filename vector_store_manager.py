@@ -38,7 +38,7 @@ class VectorStoreManager:
         if self._initialized and self.collection is not None:
             return True
 
-        logger.info("Initializing Vector Store...")
+        logger.info("Initializing Vector Store (this may take 30-60 seconds on first run)...")
 
         try:
             import chromadb
@@ -47,12 +47,15 @@ class VectorStoreManager:
 
             class LocalSentenceTransformerEmbeddingFunction(embedding_functions.EmbeddingFunction):
                 def __init__(self, model_name: str) -> None:
+                    logger.info(f"Loading SentenceTransformer model '{model_name}'...")
                     self.model = SentenceTransformer(model_name)
+                    logger.info("Model loaded successfully")
 
                 def __call__(self, input: list[str]) -> list[list[float]]:
                     return self.model.encode(input).tolist()
 
             self.chroma_client = chromadb.PersistentClient(path=str(VECTOR_STORE_DIR))
+            logger.info("ChromaDB client initialized")
             self.embedding_fn = LocalSentenceTransformerEmbeddingFunction(MODEL_NAME)
             self.collection = self.chroma_client.get_or_create_collection(
                 name=self.collection_name, embedding_function=self.embedding_fn
@@ -106,12 +109,11 @@ class VectorStoreManager:
         Returns:
             Number of items, or None if collection not initialized
         """
-        coll = self.get_collection()
-        if coll is None:
+        if not self._initialized or self.collection is None:
             return None
 
         try:
-            return coll.count()
+            return self.collection.count()
         except Exception as e:
             logger.error(f"Error getting collection count: {e}")
             return None

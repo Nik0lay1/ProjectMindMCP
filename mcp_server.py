@@ -238,6 +238,8 @@ def ingest_git_history(limit: int = 30) -> str:
 @mcp.tool()
 def get_index_stats() -> str:
     ctx = get_context()
+    if not ctx.vector_store._initialized:
+        return "Vector store not initialized. Run index_codebase() first."
     count = ctx.vector_store.get_count()
     if count is None:
         return "Vector store not initialized."
