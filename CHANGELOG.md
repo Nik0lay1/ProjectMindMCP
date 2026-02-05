@@ -1,5 +1,42 @@
 # Changelog
 
+## [0.5.5] - 2026-02-05 🔧 CRITICAL BUGFIXES & IMPROVEMENTS
+
+### Fixed
+- **Critical: Fixed numpy version incompatibility**
+  - Changed constraint from `numpy<2.0` to `numpy>=1.24.0,<2.1.0`
+  - Resolves compatibility issues with chromadb and sentence-transformers
+  - Package now correctly installed as version 0.5.5 (was stuck at 0.4.0)
+
+- **Critical: Fixed exception name shadowing**
+  - Renamed `IndexError` → `CodebaseIndexError`
+  - Renamed `MemoryError` → `MemoryOperationError`
+  - Prevents conflicts with Python built-in exceptions
+
+- **Thread-safety improvements**
+  - Added `threading.Lock` for global cache in `analyze_project_structure()`
+  - Prevents race conditions in concurrent cache access
+
+- **Fixed relative path usage**
+  - `extract_tech_stack()` now uses `PROJECT_ROOT`-based absolute paths
+  - Ensures correct file detection regardless of working directory
+
+### Added
+- **MCP Configuration Template**
+  - Added `.zencoder/mcp.local.json` configuration
+  - Server now properly recognized by MCP clients
+  - Includes full path to Python executable and server script
+
+- **Development tools**
+  - Installed mypy for type checking
+  - All linting issues resolved (ruff clean)
+
+### Technical Details
+- All 131 tests passing with 78% coverage
+- Zero ruff linting errors
+- Server startup verified
+- Compatible with numpy 2.0.2
+
 ## [0.5.4] - 2026-01-31 🧠 INTELLIGENT PROJECT AUTO-DETECTION
 
 ### Added

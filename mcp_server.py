@@ -1,5 +1,6 @@
 import os
 import sys
+import threading
 from pathlib import Path
 from time import time
 
@@ -318,8 +319,9 @@ def extract_tech_stack() -> str:
     try:
         tech_stack = []
 
-        if Path("pyproject.toml").exists():
-            content = Path("pyproject.toml").read_text()
+        pyproject_path = PROJECT_ROOT / "pyproject.toml"
+        if pyproject_path.exists():
+            content = pyproject_path.read_text()
             tech_stack.append("## Python Project")
             if "dependencies" in content:
                 tech_stack.append("\n**Dependencies:**")
@@ -335,18 +337,20 @@ def extract_tech_stack() -> str:
                         if '"' in line:
                             tech_stack.append(f"- {line.strip()}")
 
-        elif Path("requirements.txt").exists():
-            content = Path("requirements.txt").read_text()
+        requirements_path = PROJECT_ROOT / "requirements.txt"
+        if not tech_stack and requirements_path.exists():
+            content = requirements_path.read_text()
             tech_stack.append("## Python Project")
             tech_stack.append("\n**Dependencies:**")
             for line in content.split("\n"):
                 if line.strip() and not line.startswith("#"):
                     tech_stack.append(f"- {line.strip()}")
 
-        if Path("package.json").exists():
+        package_json_path = PROJECT_ROOT / "package.json"
+        if package_json_path.exists():
             import json
 
-            with open("package.json") as f:
+            with open(package_json_path) as f:
                 data = json.load(f)
             tech_stack.append("\n## JavaScript/Node.js Project")
             if "dependencies" in data:
@@ -356,10 +360,12 @@ def extract_tech_stack() -> str:
                 if len(data["dependencies"]) > 15:
                     tech_stack.append(f"... and {len(data['dependencies']) - 15} more")
 
-        if Path("Cargo.toml").exists():
+        cargo_path = PROJECT_ROOT / "Cargo.toml"
+        if cargo_path.exists():
             tech_stack.append("\n## Rust Project")
 
-        if Path("go.mod").exists():
+        gomod_path = PROJECT_ROOT / "go.mod"
+        if gomod_path.exists():
             tech_stack.append("\n## Go Project")
 
         if not tech_stack:
@@ -372,6 +378,7 @@ def extract_tech_stack() -> str:
 
 _structure_cache = None
 _structure_cache_time = 0
+_structure_cache_lock = threading.Lock()
 STRUCTURE_CACHE_TTL = 300
 
 
@@ -380,8 +387,10 @@ def analyze_project_structure() -> str:
     global _structure_cache, _structure_cache_time
 
     current_time = time()
-    if _structure_cache and (current_time - _structure_cache_time) < STRUCTURE_CACHE_TTL:
-        return _structure_cache
+
+    with _structure_cache_lock:
+        if _structure_cache and (current_time - _structure_cache_time) < STRUCTURE_CACHE_TTL:
+            return _structure_cache
 
     try:
         root = PROJECT_ROOT
@@ -450,8 +459,11 @@ def analyze_project_structure() -> str:
                 structure.append(f"- {cfg}")
 
         result = "\n".join(structure)
-        _structure_cache = result
-        _structure_cache_time = current_time
+
+        with _structure_cache_lock:
+            _structure_cache = result
+            _structure_cache_time = current_time
+
         return result
     except Exception as e:
         return f"Error analyzing structure: {e}"

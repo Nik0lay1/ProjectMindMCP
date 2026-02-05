@@ -7,7 +7,7 @@ class ProjectMindError(Exception):
     pass
 
 
-class IndexError(ProjectMindError):
+class CodebaseIndexError(ProjectMindError):
     """Errors related to codebase indexing."""
 
     pass
@@ -19,7 +19,7 @@ class SearchError(ProjectMindError):
     pass
 
 
-class MemoryError(ProjectMindError):
+class MemoryOperationError(ProjectMindError):
     """Errors related to memory file operations."""
 
     pass

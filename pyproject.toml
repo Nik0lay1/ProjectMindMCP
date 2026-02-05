@@ -1,6 +1,6 @@
 [project]
 name = "projectmind"
-version = "0.5.4"
+version = "0.5.5"
 description = "Local Context & Memory MCP Server with RAG capabilities"
 authors = [
     {name = "Mykola Riabokon"}
@@ -15,7 +15,7 @@ dependencies = [
     "GitPython>=3.1.0",
     "radon>=6.0.0",
     "pylint>=3.0.0",
-    "numpy<2.0",
+    "numpy>=1.24.0,<2.1.0",
 ]
 
 [project.optional-dependencies]
