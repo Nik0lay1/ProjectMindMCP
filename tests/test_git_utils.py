@@ -16,7 +16,7 @@ from git_utils import CommitInfo, GitRepository
 class TestCommitInfo:
     """Tests for CommitInfo dataclass."""
 
-    def test_from_commit(self):
+    def test_from_commit(self) -> None:
         """Test creating CommitInfo from git commit."""
         mock_commit = MagicMock()
         mock_commit.hexsha = "abc1234567890"
@@ -31,7 +31,7 @@ class TestCommitInfo:
         assert info.message == "Fix bug\n\nDetails here"
         assert info.author == "Test Author"
 
-    def test_first_line_truncation(self):
+    def test_first_line_truncation(self) -> None:
         """Test that first_line truncates long messages."""
         info = CommitInfo(
             hash="abc123",
@@ -43,7 +43,7 @@ class TestCommitInfo:
 
         assert len(info.first_line) <= 100
 
-    def test_date_formats(self):
+    def test_date_formats(self) -> None:
         """Test date formatting properties."""
         dt = datetime(2024, 3, 15, 14, 30)
         info = CommitInfo(
@@ -61,7 +61,7 @@ class TestCommitInfo:
 class TestGitRepository:
     """Tests for GitRepository class."""
 
-    def test_invalid_repository(self):
+    def test_invalid_repository(self) -> None:
         """Test error when not in a git repository."""
         with patch("git_utils.git.Repo") as mock_repo:
             import git
@@ -74,7 +74,7 @@ class TestGitRepository:
 
             assert "not a git repository" in str(exc_info.value).lower()
 
-    def test_get_commits(self):
+    def test_get_commits(self) -> None:
         """Test getting commits from repository."""
         with patch("git_utils.git.Repo") as mock_repo_class:
             mock_repo = MagicMock()
@@ -94,7 +94,7 @@ class TestGitRepository:
             assert len(commits) == 1
             assert commits[0].short_hash == "abc1234"
 
-    def test_get_commits_with_since_days(self):
+    def test_get_commits_with_since_days(self) -> None:
         """Test getting commits filtered by date."""
         with patch("git_utils.git.Repo") as mock_repo_class:
             mock_repo = MagicMock()
@@ -120,7 +120,7 @@ class TestGitRepository:
             assert len(commits) == 1
             assert commits[0].short_hash == "recent1"
 
-    def test_get_author_stats(self):
+    def test_get_author_stats(self) -> None:
         """Test author statistics calculation."""
         commits = [
             CommitInfo("a", "a", "msg", "Alice", datetime.now()),
@@ -135,7 +135,7 @@ class TestGitRepository:
         assert stats["Bob"] == 1
         assert list(stats.keys())[0] == "Alice"
 
-    def test_format_commits_summary(self):
+    def test_format_commits_summary(self) -> None:
         """Test commit summary formatting."""
         commits = [
             CommitInfo("a", "abc", "First commit", "Alice", datetime(2024, 1, 1, 10, 0)),
@@ -149,7 +149,7 @@ class TestGitRepository:
         assert "abc" in lines[0]
         assert "First commit" in lines[0]
 
-    def test_format_commits_summary_truncation(self):
+    def test_format_commits_summary_truncation(self) -> None:
         """Test commit summary truncation."""
         commits = [
             CommitInfo("a", f"h{i}", f"Commit {i}", "Author", datetime.now()) for i in range(15)
@@ -161,7 +161,7 @@ class TestGitRepository:
         assert len(lines) == 6
         assert "... and 10 more commits" in lines[-1]
 
-    def test_format_author_stats(self):
+    def test_format_author_stats(self) -> None:
         """Test author stats formatting."""
         stats = {"Alice": 5, "Bob": 3}
 

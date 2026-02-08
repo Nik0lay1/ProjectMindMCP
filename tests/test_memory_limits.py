@@ -6,13 +6,13 @@ sys.path.append(os.getcwd())
 from memory_limited_indexer import MemoryLimitedIndexer
 
 
-def test_basic_indexing():
+def test_basic_indexing() -> None:
     """Test basic chunk addition and retrieval"""
     print("Testing basic indexing...")
 
-    batches = []
+    batches: list[tuple[list[str], list[dict[str, str]], list[str]]] = []
 
-    def collect_batch(documents, metadatas, ids):
+    def collect_batch(documents: list[str], metadatas: list[dict[str, str]], ids: list[str]) -> None:
         batches.append((documents.copy(), metadatas.copy(), ids.copy()))
 
     indexer = MemoryLimitedIndexer(1024 * 1024, collect_batch)
@@ -28,13 +28,13 @@ def test_basic_indexing():
     print("  [OK] Basic indexing works")
 
 
-def test_memory_limit_flush():
+def test_memory_limit_flush() -> None:
     """Test that indexer flushes when memory limit reached"""
     print("Testing memory limit auto-flush...")
 
-    batches = []
+    batches: list[tuple[list[str], list[dict[str, str]], list[str]]] = []
 
-    def collect_batch(documents, metadatas, ids):
+    def collect_batch(documents: list[str], metadatas: list[dict[str, str]], ids: list[str]) -> None:
         batches.append((documents.copy(), metadatas.copy(), ids.copy()))
 
     small_limit = 500
@@ -65,13 +65,13 @@ def test_memory_limit_flush():
     print(f"  [OK] Memory limit triggers flush (total batches: {stats['total_batches']})")
 
 
-def test_manual_flush():
+def test_manual_flush() -> None:
     """Test manual flush operation"""
     print("Testing manual flush...")
 
-    batches = []
+    batches: list[int] = []
 
-    def collect_batch(documents, metadatas, ids):
+    def collect_batch(documents: list[str], metadatas: list[dict[str, str]], ids: list[str]) -> None:
         batches.append(len(documents))
 
     indexer = MemoryLimitedIndexer(10 * 1024 * 1024, collect_batch)
@@ -91,14 +91,14 @@ def test_manual_flush():
     print("  [OK] Manual flush works correctly")
 
 
-def test_memory_estimation():
+def test_memory_estimation() -> None:
     """Test memory size estimation"""
     print("Testing memory estimation...")
 
-    batches = []
+    batches: list[int] = []
     flush_count = [0]
 
-    def count_flush(documents, metadatas, ids):
+    def count_flush(documents: list[str], metadatas: list[dict[str, str]], ids: list[str]) -> None:
         flush_count[0] += 1
         batches.append(len(documents))
 
@@ -122,13 +122,13 @@ def test_memory_estimation():
     )
 
 
-def test_empty_flush():
+def test_empty_flush() -> None:
     """Test that flushing empty buffer doesn't call callback"""
     print("Testing empty flush...")
 
     call_count = [0]
 
-    def count_calls(documents, metadatas, ids):
+    def count_calls(documents: list[str], metadatas: list[dict[str, str]], ids: list[str]) -> None:
         call_count[0] += 1
 
     indexer = MemoryLimitedIndexer(1024, count_calls)
@@ -146,13 +146,13 @@ def test_empty_flush():
     print("  [OK] Empty flush doesn't call callback")
 
 
-def test_metadata_preservation():
+def test_metadata_preservation() -> None:
     """Test that metadata is correctly preserved"""
     print("Testing metadata preservation...")
 
-    collected = []
+    collected: list[tuple[list[str], list[dict[str, str | int]], list[str]]] = []
 
-    def collect(documents, metadatas, ids):
+    def collect(documents: list[str], metadatas: list[dict[str, str | int]], ids: list[str]) -> None:
         collected.append((documents.copy(), metadatas.copy(), ids.copy()))
 
     indexer = MemoryLimitedIndexer(10 * 1024 * 1024, collect)
@@ -180,7 +180,7 @@ def test_metadata_preservation():
     print("  [OK] Metadata preserved correctly")
 
 
-def test_buffer_clearing():
+def test_buffer_clearing() -> None:
     """Test that buffer is cleared after flush"""
     print("Testing buffer clearing...")
 

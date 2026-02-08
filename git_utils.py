@@ -24,11 +24,15 @@ class CommitInfo:
 
     @classmethod
     def from_commit(cls, commit: git.Commit) -> "CommitInfo":
+        message = commit.message
+        if isinstance(message, bytes):
+            message = message.decode("utf-8", errors="replace")
+        author_name = commit.author.name if commit.author and commit.author.name else "Unknown"
         return cls(
             hash=commit.hexsha,
             short_hash=commit.hexsha[:7],
-            message=commit.message.strip(),
-            author=commit.author.name,
+            message=message.strip(),
+            author=author_name,
             date=datetime.fromtimestamp(commit.committed_date),
         )
 

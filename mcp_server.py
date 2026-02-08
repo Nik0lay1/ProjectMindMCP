@@ -376,8 +376,8 @@ def extract_tech_stack() -> str:
         return f"Error extracting tech stack: {e}"
 
 
-_structure_cache = None
-_structure_cache_time = 0
+_structure_cache: str | None = None
+_structure_cache_time: float = 0.0
 _structure_cache_lock = threading.Lock()
 STRUCTURE_CACHE_TTL = 300
 
@@ -414,7 +414,7 @@ def analyze_project_structure() -> str:
         for dir_name, count in sorted_dirs:
             structure.append(f"- `{dir_name}/` ({count} items)")
 
-        file_types = {}
+        file_types: dict[str, int] = {}
         for _root_path, dirs, files in os.walk(root):
             dirs[:] = [d for d in dirs if d not in ignored_dirs]
 

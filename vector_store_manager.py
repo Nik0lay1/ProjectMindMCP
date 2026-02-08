@@ -1,5 +1,6 @@
 import hashlib
 import json
+from typing import Any
 
 from cache_manager import TTLCache
 from config import MODEL_NAME, VECTOR_STORE_DIR
@@ -14,7 +15,7 @@ class VectorStoreManager:
     Encapsulates client, collection, and embedding function management.
     """
 
-    def __init__(self, collection_name: str = "project_codebase"):
+    def __init__(self, collection_name: str = "project_codebase") -> None:
         """
         Initialize vector store manager.
 
@@ -22,9 +23,9 @@ class VectorStoreManager:
             collection_name: Name of the ChromaDB collection
         """
         self.collection_name = collection_name
-        self.chroma_client = None
-        self.collection = None
-        self.embedding_fn = None
+        self.chroma_client: Any = None
+        self.collection: Any = None
+        self.embedding_fn: Any = None
         self._initialized = False
         self._query_cache = TTLCache(ttl_seconds=300, max_size=100)
 
@@ -45,14 +46,14 @@ class VectorStoreManager:
             from chromadb.utils import embedding_functions
             from sentence_transformers import SentenceTransformer
 
-            class LocalSentenceTransformerEmbeddingFunction(embedding_functions.EmbeddingFunction):
+            class LocalSentenceTransformerEmbeddingFunction(embedding_functions.EmbeddingFunction):  # type: ignore[type-arg]
                 def __init__(self, model_name: str) -> None:
                     logger.info(f"Loading SentenceTransformer model '{model_name}'...")
                     self.model = SentenceTransformer(model_name)
                     logger.info("Model loaded successfully")
 
-                def __call__(self, input: list[str]) -> list[list[float]]:
-                    return self.model.encode(input).tolist()
+                def __call__(self, input: list[str]) -> list[list[float]]:  # type: ignore[override]
+                    return self.model.encode(input).tolist()  # type: ignore[return-value]
 
             self.chroma_client = chromadb.PersistentClient(path=str(VECTOR_STORE_DIR))
             logger.info("ChromaDB client initialized")
@@ -68,7 +69,7 @@ class VectorStoreManager:
             logger.error(f"Failed to initialize ChromaDB: {e}", exc_info=True)
             return False
 
-    def get_collection(self):
+    def get_collection(self) -> Any:
         """
         Gets the collection, initializing if needed.
 
@@ -122,9 +123,9 @@ class VectorStoreManager:
         self,
         query_texts: list[str],
         n_results: int = 5,
-        where: dict | None = None,
-        where_document: dict | None = None,
-    ) -> dict | None:
+        where: dict[str, Any] | None = None,
+        where_document: dict[str, Any] | None = None,
+    ) -> dict[str, Any] | None:
         """
         Queries the vector store with caching.
 
@@ -148,7 +149,7 @@ class VectorStoreManager:
             return None
 
         try:
-            result = coll.query(
+            result: dict[str, Any] = coll.query(
                 query_texts=query_texts,
                 n_results=n_results,
                 where=where,
@@ -164,8 +165,8 @@ class VectorStoreManager:
         self,
         query_texts: list[str],
         n_results: int,
-        where: dict | None,
-        where_document: dict | None,
+        where: dict[str, Any] | None,
+        where_document: dict[str, Any] | None,
     ) -> str:
         """
         Generates a unique cache key for query parameters.
@@ -188,7 +189,7 @@ class VectorStoreManager:
         key_str = json.dumps(key_data, sort_keys=True)
         return hashlib.sha256(key_str.encode()).hexdigest()
 
-    def get_query_cache_stats(self):
+    def get_query_cache_stats(self) -> dict[str, Any]:
         """
         Returns query cache statistics.
 

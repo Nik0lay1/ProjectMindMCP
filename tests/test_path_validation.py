@@ -8,7 +8,7 @@ sys.path.append(os.getcwd())
 from config import PROJECT_ROOT, validate_path
 
 
-def test_valid_paths():
+def test_valid_paths() -> None:
     """Test that valid paths within project are accepted"""
     print("Testing valid paths...")
 
@@ -27,7 +27,7 @@ def test_valid_paths():
     print("[PASS] Valid paths test passed\n")
 
 
-def test_invalid_paths():
+def test_invalid_paths() -> None:
     """Test that paths outside project are rejected"""
     print("Testing invalid paths...")
 
@@ -51,7 +51,7 @@ def test_invalid_paths():
     print("[PASS] Invalid paths test passed\n")
 
 
-def test_edge_cases():
+def test_edge_cases() -> None:
     """Test edge cases"""
     print("Testing edge cases...")
 

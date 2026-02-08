@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 
-def test_mcp_server():
+def test_mcp_server() -> None:
     """Test basic MCP server communication"""
 
     # Determine python executable path based on platform
@@ -41,11 +41,13 @@ def test_mcp_server():
 
         print("Sending initialize request...")
         request_str = json.dumps(initialize_request) + "\n"
+        assert process.stdin is not None
         process.stdin.write(request_str)
         process.stdin.flush()
 
         # Read response
         print("Waiting for response...")
+        assert process.stdout is not None
         response_line = process.stdout.readline()
         print(f"Response: {response_line}")
 
@@ -56,28 +58,33 @@ def test_mcp_server():
             if "result" in response:
                 print("\n✅ Server responded successfully!")
                 print(f"Server capabilities: {response['result'].get('capabilities', {})}")
-                return True
+                assert True
             elif "error" in response:
                 print(f"\n❌ Server returned error: {response['error']}")
-                return False
+                raise AssertionError(f"Server returned error: {response['error']}")
         else:
             print("\n❌ No response from server")
+            assert process.stderr is not None
             stderr = process.stderr.read()
             if stderr:
                 print(f"Server stderr: {stderr}")
-            return False
+            raise AssertionError("No response from server")
 
-    except Exception as e:
-        print(f"\n❌ Error: {e}")
+    except json.JSONDecodeError as e:
+        print(f"\n❌ JSON Error: {e}")
+        assert process.stderr is not None
         stderr = process.stderr.read()
         if stderr:
             print(f"Server stderr: {stderr}")
-        return False
+        raise AssertionError(f"JSON decode error: {e}") from e
     finally:
         process.terminate()
         process.wait(timeout=1)
 
 
 if __name__ == "__main__":
-    success = test_mcp_server()
-    sys.exit(0 if success else 1)
+    try:
+        test_mcp_server()
+        sys.exit(0)
+    except AssertionError:
+        sys.exit(1)

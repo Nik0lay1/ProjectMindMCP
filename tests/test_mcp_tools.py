@@ -31,7 +31,7 @@ except ImportError as e:
     sys.exit(1)
 
 
-def test_memory_tools():
+def test_memory_tools() -> None:
     print("\n--- Testing Memory Tools ---")
 
     initial_memory = read_memory()
@@ -54,7 +54,7 @@ def test_memory_tools():
     print("Memory tools verification passed.")
 
 
-def test_memory_management():
+def test_memory_management() -> None:
     print("\n--- Testing Memory Management ---")
 
     update_memory("Test section content", section="Test Section")
@@ -69,7 +69,7 @@ def test_memory_management():
     print("Memory management verification passed.")
 
 
-def test_rag_tools():
+def test_rag_tools() -> None:
     print("\n--- Testing RAG Tools ---")
 
     print("Indexing codebase...")
@@ -100,7 +100,7 @@ def test_rag_tools():
     print("RAG tools verification passed.")
 
 
-def test_search_validation():
+def test_search_validation() -> None:
     print("\n--- Testing Search Validation ---")
 
     empty_query = search_codebase("")
@@ -118,7 +118,7 @@ def test_search_validation():
     print("Search validation verification passed.")
 
 
-def test_git_integration():
+def test_git_integration() -> None:
     print("\n--- Testing Git Integration ---")
 
     git_result = ingest_git_history(limit=5)
@@ -140,7 +140,7 @@ def test_git_integration():
     print("Git integration verification passed.")
 
 
-def test_analysis_tools():
+def test_analysis_tools() -> None:
     print("\n--- Testing Analysis Tools ---")
 
     summary = generate_project_summary()
@@ -171,7 +171,7 @@ def test_analysis_tools():
     print("Analysis tools verification passed.")
 
 
-def test_incremental_indexing():
+def test_incremental_indexing() -> None:
     print("\n--- Testing Incremental Indexing ---")
 
     result = index_changed_files()
@@ -186,7 +186,7 @@ def test_incremental_indexing():
     print("Incremental indexing verification passed.")
 
 
-def test_advanced_search():
+def test_advanced_search() -> None:
     print("\n--- Testing Advanced Search ---")
 
     result = search_codebase_advanced(
@@ -203,7 +203,7 @@ def test_advanced_search():
     print("Advanced search verification passed.")
 
 
-def test_auto_memory_updates():
+def test_auto_memory_updates() -> None:
     print("\n--- Testing Auto Memory Updates ---")
 
     result = auto_update_memory_from_commits(days=7)
@@ -219,7 +219,7 @@ def test_auto_memory_updates():
     print("Auto memory updates verification passed.")
 
 
-def test_code_metrics():
+def test_code_metrics() -> None:
     print("\n--- Testing Code Metrics ---")
 
     complexity = analyze_code_complexity(".")
@@ -233,7 +233,7 @@ def test_code_metrics():
     print("Code metrics verification passed.")
 
 
-def test_memory_versioning():
+def test_memory_versioning() -> None:
     print("\n--- Testing Memory Versioning ---")
 
     save_result = save_memory_version(description="Test version")

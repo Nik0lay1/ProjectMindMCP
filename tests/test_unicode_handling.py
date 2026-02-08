@@ -10,7 +10,7 @@ sys.path.append(os.getcwd())
 from config import safe_read_text
 
 
-def test_utf8_file():
+def test_utf8_file() -> None:
     """Test reading UTF-8 file"""
     print("Testing UTF-8 file...")
 
@@ -32,7 +32,7 @@ def test_utf8_file():
         temp_path.unlink()
 
 
-def test_latin1_file():
+def test_latin1_file() -> None:
     """Test reading Latin-1 file"""
     print("Testing Latin-1 file...")
 
@@ -48,7 +48,7 @@ def test_latin1_file():
         temp_path.unlink()
 
 
-def test_windows1252_file():
+def test_windows1252_file() -> None:
     """Test reading Windows-1252 file"""
     print("Testing Windows-1252 file...")
 
@@ -64,7 +64,7 @@ def test_windows1252_file():
         temp_path.unlink()
 
 
-def test_utf8_with_bom():
+def test_utf8_with_bom() -> None:
     """Test reading UTF-8 with BOM file"""
     print("Testing UTF-8 with BOM...")
 
@@ -80,7 +80,7 @@ def test_utf8_with_bom():
         temp_path.unlink()
 
 
-def test_nonexistent_file():
+def test_nonexistent_file() -> None:
     """Test that nonexistent files raise appropriate error"""
     print("Testing nonexistent file...")
 

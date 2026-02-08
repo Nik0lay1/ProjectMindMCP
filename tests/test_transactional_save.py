@@ -12,7 +12,7 @@ from config import INDEX_METADATA_FILE
 from incremental_indexing import IndexMetadata, atomic_write
 
 
-def test_atomic_write():
+def test_atomic_write() -> None:
     """Test atomic write creates file correctly"""
     print("Testing atomic write...")
 
@@ -33,7 +33,7 @@ def test_atomic_write():
         print("  [OK] Atomic write creates file correctly")
 
 
-def test_atomic_write_overwrite():
+def test_atomic_write_overwrite() -> None:
     """Test atomic write overwrites existing file"""
     print("Testing atomic write overwrite...")
 
@@ -50,7 +50,7 @@ def test_atomic_write_overwrite():
         print("  [OK] Atomic write overwrites correctly")
 
 
-def test_atomic_write_rollback_on_error():
+def test_atomic_write_rollback_on_error() -> None:
     """Test that atomic write cleans up temp files on error"""
     print("Testing atomic write error cleanup...")
 
@@ -84,7 +84,7 @@ def test_atomic_write_rollback_on_error():
         print("  [OK] Failed write cleans up temp files")
 
 
-def test_metadata_save_load():
+def test_metadata_save_load() -> None:
     """Test IndexMetadata save and load cycle"""
     print("Testing metadata save/load...")
 
@@ -105,7 +105,7 @@ def test_metadata_save_load():
     print("  [OK] Metadata save/load works correctly")
 
 
-def test_concurrent_writes():
+def test_concurrent_writes() -> None:
     """Test that concurrent writes don't corrupt file"""
     print("Testing concurrent writes...")
 
@@ -156,7 +156,7 @@ def test_concurrent_writes():
         )
 
 
-def test_no_temp_files_left():
+def test_no_temp_files_left() -> None:
     """Test that temporary files are cleaned up"""
     print("Testing temp file cleanup...")
 

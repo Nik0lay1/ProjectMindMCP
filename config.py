@@ -1,6 +1,7 @@
 import os
 import sys
 from pathlib import Path
+from typing import Any
 
 
 def find_project_root() -> Path:
@@ -300,7 +301,7 @@ def safe_read_text(file_path: Path) -> str:
     )
 
 
-def get_file_cache_stats():
+def get_file_cache_stats() -> dict[str, Any]:
     """
     Returns file cache statistics.
 

@@ -12,7 +12,7 @@ from context import AppContext, get_context, reset_context, set_context
 
 
 @pytest.fixture(autouse=True)
-def clean_context():
+def clean_context() -> None:
     """Reset context before and after each test."""
     reset_context()
     yield
@@ -22,7 +22,7 @@ def clean_context():
 class TestAppContext:
     """Tests for AppContext dataclass."""
 
-    def test_create_with_all_dependencies(self):
+    def test_create_with_all_dependencies(self) -> None:
         """Test creating context with all dependencies."""
         mock_vector_store = MagicMock()
         mock_memory_manager = MagicMock()
@@ -41,7 +41,7 @@ class TestAppContext:
         assert ctx.indexer is mock_indexer
         assert ctx.git_repo is mock_git_repo
 
-    def test_git_repo_optional(self):
+    def test_git_repo_optional(self) -> None:
         """Test that git_repo is optional."""
         ctx = AppContext(
             vector_store=MagicMock(),
@@ -55,7 +55,7 @@ class TestAppContext:
 class TestContextFunctions:
     """Tests for context management functions."""
 
-    def test_set_and_get_context(self):
+    def test_set_and_get_context(self) -> None:
         """Test setting and getting context."""
         mock_ctx = AppContext(
             vector_store=MagicMock(),
@@ -68,7 +68,7 @@ class TestContextFunctions:
 
         assert result is mock_ctx
 
-    def test_reset_context(self):
+    def test_reset_context(self) -> None:
         """Test resetting context."""
         mock_ctx = AppContext(
             vector_store=MagicMock(),
@@ -82,7 +82,7 @@ class TestContextFunctions:
         new_ctx = get_context()
         assert new_ctx is not mock_ctx
 
-    def test_get_context_creates_default(self):
+    def test_get_context_creates_default(self) -> None:
         """Test that get_context creates default context if none exists."""
         ctx = get_context()
 
@@ -91,7 +91,7 @@ class TestContextFunctions:
         assert ctx.memory_manager is not None
         assert ctx.indexer is not None
 
-    def test_get_context_returns_same_instance(self):
+    def test_get_context_returns_same_instance(self) -> None:
         """Test that get_context returns the same instance."""
         ctx1 = get_context()
         ctx2 = get_context()
@@ -102,7 +102,7 @@ class TestContextFunctions:
 class TestAppContextCreateDefault:
     """Tests for AppContext.create_default()."""
 
-    def test_create_default_initializes_all_services(self):
+    def test_create_default_initializes_all_services(self) -> None:
         """Test that create_default initializes all required services."""
         ctx = AppContext.create_default()
 

@@ -245,7 +245,7 @@ class FileCache:
                 if cached_mtime is not None and cached_mtime == current_mtime:
                     content = self.lru_cache.get(key)
                     if content is not None:
-                        return content
+                        return str(content)
 
                 return None
         except Exception as e:

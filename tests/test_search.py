@@ -12,7 +12,7 @@ from context import AppContext, reset_context, set_context
 
 
 @pytest.fixture(autouse=True)
-def reset_app_context():
+def reset_app_context() -> None:
     """Reset context before and after each test."""
     reset_context()
     yield
@@ -20,7 +20,7 @@ def reset_app_context():
 
 
 @pytest.fixture
-def mock_vector_store():
+def mock_vector_store() -> MagicMock:
     """Create a mock vector store."""
     store = MagicMock()
     store.get_collection.return_value = MagicMock()
@@ -43,7 +43,7 @@ def mock_vector_store():
 
 
 @pytest.fixture
-def mock_memory_manager():
+def mock_memory_manager() -> MagicMock:
     """Create a mock memory manager."""
     manager = MagicMock()
     manager.read.return_value = "# Test Memory"
@@ -51,13 +51,13 @@ def mock_memory_manager():
 
 
 @pytest.fixture
-def mock_indexer():
+def mock_indexer() -> MagicMock:
     """Create a mock indexer."""
     return MagicMock()
 
 
 @pytest.fixture
-def mock_context(mock_vector_store, mock_memory_manager, mock_indexer):
+def mock_context(mock_vector_store: MagicMock, mock_memory_manager: MagicMock, mock_indexer: MagicMock) -> AppContext:
     """Create and set mock application context."""
     ctx = AppContext(
         vector_store=mock_vector_store,
@@ -72,7 +72,7 @@ def mock_context(mock_vector_store, mock_memory_manager, mock_indexer):
 class TestSearchCodebase:
     """Tests for search_codebase function."""
 
-    def test_search_empty_query(self, mock_context):
+    def test_search_empty_query(self, mock_context: AppContext) -> None:
         """Test that empty query returns error."""
         from mcp_server import search_codebase
 
@@ -80,14 +80,14 @@ class TestSearchCodebase:
         assert "Error" in result
         assert "empty" in result.lower()
 
-    def test_search_whitespace_query(self, mock_context):
+    def test_search_whitespace_query(self, mock_context: AppContext) -> None:
         """Test that whitespace-only query returns error."""
         from mcp_server import search_codebase
 
         result = search_codebase("   ")
         assert "Error" in result
 
-    def test_search_negative_n_results(self, mock_context):
+    def test_search_negative_n_results(self, mock_context: AppContext) -> None:
         """Test that negative n_results returns error."""
         from mcp_server import search_codebase
 
@@ -95,7 +95,7 @@ class TestSearchCodebase:
         assert "Error" in result
         assert "greater than 0" in result
 
-    def test_search_exceeds_max_results(self, mock_context):
+    def test_search_exceeds_max_results(self, mock_context: AppContext) -> None:
         """Test that n_results > 50 returns error."""
         from mcp_server import search_codebase
 
@@ -103,7 +103,7 @@ class TestSearchCodebase:
         assert "Error" in result
         assert "50" in result
 
-    def test_search_valid_query(self, mock_context, mock_vector_store):
+    def test_search_valid_query(self, mock_context: AppContext, mock_vector_store: MagicMock) -> None:
         """Test successful search with valid query."""
         from mcp_server import search_codebase
 
@@ -111,7 +111,7 @@ class TestSearchCodebase:
         assert "test.py" in result
         mock_vector_store.query.assert_called_once()
 
-    def test_search_no_matches(self, mock_context, mock_vector_store):
+    def test_search_no_matches(self, mock_context: AppContext, mock_vector_store: MagicMock) -> None:
         """Test search with no matches."""
         from mcp_server import search_codebase
 
@@ -119,7 +119,7 @@ class TestSearchCodebase:
         result = search_codebase("nonexistent")
         assert "No matches found" in result
 
-    def test_search_vector_store_not_initialized(self, mock_context, mock_vector_store):
+    def test_search_vector_store_not_initialized(self, mock_context: AppContext, mock_vector_store: MagicMock) -> None:
         """Test search when vector store returns None."""
         from mcp_server import search_codebase
 
@@ -131,14 +131,14 @@ class TestSearchCodebase:
 class TestSearchCodebaseAdvanced:
     """Tests for search_codebase_advanced function."""
 
-    def test_advanced_search_empty_query(self, mock_context):
+    def test_advanced_search_empty_query(self, mock_context: AppContext) -> None:
         """Test that empty query returns error."""
         from mcp_server import search_codebase_advanced
 
         result = search_codebase_advanced("")
         assert "Error" in result
 
-    def test_advanced_search_invalid_relevance(self, mock_context):
+    def test_advanced_search_invalid_relevance(self, mock_context: AppContext) -> None:
         """Test that invalid min_relevance returns error."""
         from mcp_server import search_codebase_advanced
 
@@ -146,14 +146,14 @@ class TestSearchCodebaseAdvanced:
         assert "Error" in result
         assert "0 and 1" in result
 
-    def test_advanced_search_file_type_filter(self, mock_context, mock_vector_store):
+    def test_advanced_search_file_type_filter(self, mock_context: AppContext, mock_vector_store: MagicMock) -> None:
         """Test search with file type filter."""
         from mcp_server import search_codebase_advanced
 
         result = search_codebase_advanced("test", file_types=[".py"])
         assert "test.py" in result or "world.py" in result
 
-    def test_advanced_search_exclude_dirs(self, mock_context, mock_vector_store):
+    def test_advanced_search_exclude_dirs(self, mock_context: AppContext, mock_vector_store: MagicMock) -> None:
         """Test search with directory exclusion."""
         from mcp_server import search_codebase_advanced
 
@@ -170,7 +170,7 @@ class TestSearchCodebaseAdvanced:
 class TestGetIndexStats:
     """Tests for get_index_stats function."""
 
-    def test_get_stats_success(self, mock_context, mock_vector_store):
+    def test_get_stats_success(self, mock_context: AppContext, mock_vector_store: MagicMock) -> None:
         """Test successful stats retrieval."""
         from mcp_server import get_index_stats
 
@@ -178,7 +178,7 @@ class TestGetIndexStats:
         assert "100" in result
         assert "chunks" in result.lower()
 
-    def test_get_stats_not_initialized(self, mock_context, mock_vector_store):
+    def test_get_stats_not_initialized(self, mock_context: AppContext, mock_vector_store: MagicMock) -> None:
         """Test stats when vector store not initialized."""
         from mcp_server import get_index_stats
 
@@ -190,7 +190,7 @@ class TestGetIndexStats:
 class TestGetCacheStats:
     """Tests for get_cache_stats function."""
 
-    def test_cache_stats_format(self, mock_context):
+    def test_cache_stats_format(self, mock_context: AppContext) -> None:
         """Test cache stats output format."""
         from mcp_server import get_cache_stats
 

@@ -15,7 +15,7 @@ else:
 
 
 @contextmanager
-def file_lock(file_handle):
+def file_lock(file_handle) -> None:  # type: ignore[misc]
     """
     Cross-platform file locking context manager.
     Prevents concurrent writes to the same file.
@@ -80,8 +80,8 @@ def atomic_write(file_path: Path, content: str) -> None:
 
 
 class IndexMetadata:
-    def __init__(self):
-        self.metadata: dict[str, dict] = {}
+    def __init__(self) -> None:
+        self.metadata: dict[str, dict[str, str | float]] = {}
         self.load()
 
     def load(self) -> None:
@@ -144,13 +144,15 @@ class IndexMetadata:
         for file_path in files_to_remove:
             del self.metadata[file_path]
 
-    def get_stats(self) -> dict:
+    def get_stats(self) -> dict[str, int | str | None]:
         if not self.metadata:
             return {"total_files": 0, "last_index": None}
 
-        indexed_times = [
-            info.get("indexed_at") for info in self.metadata.values() if "indexed_at" in info
+        indexed_times: list[str] = [
+            str(info.get("indexed_at"))
+            for info in self.metadata.values()
+            if "indexed_at" in info
         ]
-        latest = max(indexed_times) if indexed_times else None
+        latest: str | None = max(indexed_times) if indexed_times else None
 
         return {"total_files": len(self.metadata), "last_index": latest}

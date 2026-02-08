@@ -9,7 +9,7 @@ from config import LOG_FILE
 from logger import get_logger, setup_logger
 
 
-def test_logger_setup():
+def test_logger_setup() -> None:
     """Test logger can be initialized"""
     print("Testing logger setup...")
 
@@ -19,7 +19,7 @@ def test_logger_setup():
     print("  [OK] Logger initialized")
 
 
-def test_logger_singleton():
+def test_logger_singleton() -> None:
     """Test logger is singleton"""
     print("Testing logger singleton pattern...")
 
@@ -29,7 +29,7 @@ def test_logger_singleton():
     print("  [OK] Logger singleton works")
 
 
-def test_log_file_creation():
+def test_log_file_creation() -> None:
     """Test that log file is created"""
     print("Testing log file creation...")
 
@@ -48,7 +48,7 @@ def test_log_file_creation():
         print("  [WARNING] Log file not created (might be permission issue)")
 
 
-def test_log_levels():
+def test_log_levels() -> None:
     """Test different log levels"""
     print("Testing log levels...")
 
@@ -63,7 +63,7 @@ def test_log_levels():
     print("  [OK] All log levels work without errors")
 
 
-def test_log_rotation_config():
+def test_log_rotation_config() -> None:
     """Test log rotation configuration"""
     print("Testing log rotation configuration...")
 
