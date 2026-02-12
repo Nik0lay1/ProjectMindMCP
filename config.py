@@ -1,7 +1,10 @@
+import fnmatch
 import os
 import sys
 from pathlib import Path
 from typing import Any
+
+_MCP_SERVER_DIR = Path(__file__).resolve().parent
 
 
 def find_project_root() -> Path:
@@ -10,54 +13,50 @@ def find_project_root() -> Path:
 
     Detection strategy:
     1. Check command-line argument --project-root
-    2. Check environment variables (WORKSPACE_FOLDER, PROJECT_ROOT)
-    3. Search upward for project markers (.git, .ai/, package.json, pyproject.toml, etc.)
+    2. Check environment variables (WORKSPACE_FOLDER, PROJECT_ROOT, PROJECT_PATH)
+    3. Search upward from CWD for project markers, skipping the MCP server's own directory
     4. Fall back to current working directory
 
     Returns:
         Path to project root directory
     """
-    # Strategy 1: Check command-line arguments
     for i, arg in enumerate(sys.argv):
         if arg == "--project-root" and i + 1 < len(sys.argv):
             project_path = Path(sys.argv[i + 1]).resolve()
             if project_path.exists():
                 return project_path
 
-    # Strategy 2: Check environment variables
     for env_var in ["WORKSPACE_FOLDER", "PROJECT_ROOT", "PROJECT_PATH"]:
         if env_path := os.getenv(env_var):
             project_path = Path(env_path).resolve()
             if project_path.exists():
                 return project_path
 
-    # Strategy 3: Search upward for project markers
     current = Path.cwd().resolve()
     project_markers = [
-        ".git",  # Git repository
-        ".ai",  # ProjectMind directory
-        "package.json",  # Node.js project
-        "pyproject.toml",  # Python project
-        "Cargo.toml",  # Rust project
-        "go.mod",  # Go project
-        "pom.xml",  # Maven project
-        "build.gradle",  # Gradle project
-        ".project",  # Eclipse project
-        ".vscode",  # VS Code workspace
+        ".git",
+        ".ai",
+        "package.json",
+        "pyproject.toml",
+        "Cargo.toml",
+        "go.mod",
+        "pom.xml",
+        "build.gradle",
+        ".project",
+        ".vscode",
     ]
 
-    # Search up to 10 levels up
     for _ in range(10):
-        for marker in project_markers:
-            if (current / marker).exists():
-                return current
+        if current != _MCP_SERVER_DIR:
+            for marker in project_markers:
+                if (current / marker).exists():
+                    return current
 
         parent = current.parent
-        if parent == current:  # Reached root
+        if parent == current:
             break
         current = parent
 
-    # Strategy 4: Fall back to cwd
     return Path.cwd().resolve()
 
 
@@ -95,11 +94,11 @@ DEFAULT_IGNORED_DIRS: set[str] = {
     ".vscode",
     "dist",
     "build",
-    "target",  # Rust/Maven
-    "vendor",  # Go/PHP/Ruby
-    "bin",  # C#/Java
-    "obj",  # C#
-    "out",  # Java/Kotlin
+    "target",
+    "vendor",
+    "bin",
+    "obj",
+    "out",
     "logs",
     "tmp",
     "temp",
@@ -111,6 +110,9 @@ DEFAULT_IGNORED_DIRS: set[str] = {
     "htmlcov",
     ".coverage",
     ".tox",
+}
+
+IGNORED_DIR_PATTERNS: set[str] = {
     "*.egg-info",
 }
 
@@ -223,6 +225,12 @@ def get_max_memory_bytes() -> int:
 
 def get_ignored_dirs() -> set[str]:
     return DEFAULT_IGNORED_DIRS.copy()
+
+
+def is_dir_ignored(dir_name: str) -> bool:
+    if dir_name in DEFAULT_IGNORED_DIRS:
+        return True
+    return any(fnmatch.fnmatch(dir_name, pat) for pat in IGNORED_DIR_PATTERNS)
 
 
 def validate_path(path: str) -> Path:

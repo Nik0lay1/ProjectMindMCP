@@ -21,16 +21,18 @@ def file_lock(file_handle) -> None:  # type: ignore[misc]
     Prevents concurrent writes to the same file.
     """
     if sys.platform == "win32":
+        file_handle.seek(0, 2)
+        file_size = max(file_handle.tell(), 1)
         file_handle.seek(0)
         locked = False
         try:
-            msvcrt.locking(file_handle.fileno(), msvcrt.LK_NBLCK, 1)
+            msvcrt.locking(file_handle.fileno(), msvcrt.LK_NBLCK, file_size)
             locked = True
             yield
         finally:
             if locked:
                 file_handle.seek(0)
-                msvcrt.locking(file_handle.fileno(), msvcrt.LK_UNLCK, 1)
+                msvcrt.locking(file_handle.fileno(), msvcrt.LK_UNLCK, file_size)
     else:
         try:
             fcntl.flock(file_handle.fileno(), fcntl.LOCK_EX)

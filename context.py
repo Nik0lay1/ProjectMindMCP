@@ -58,12 +58,16 @@ _app_context: AppContext | None = None
 def get_context() -> AppContext:
     """
     Gets the global application context, creating it if necessary.
+    Also ensures startup initialization has been performed.
 
     Returns:
         Global AppContext instance
     """
     global _app_context
     if _app_context is None:
+        from mcp_server import ensure_startup
+
+        ensure_startup()
         _app_context = AppContext.create_default()
     return _app_context
 

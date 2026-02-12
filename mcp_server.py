@@ -13,6 +13,7 @@ from config import (
     PROJECT_ROOT,
     get_file_cache_stats,
     get_ignored_dirs,
+    is_dir_ignored,
     validate_path,
 )
 from context import get_context
@@ -44,31 +45,33 @@ def startup_check() -> None:
         log(f"Warning: Could not create {AI_DIR}: {e}. Server will continue if directory exists.")
 
     try:
-        gitignore_path = PROJECT_ROOT / ".gitignore"
-        ai_ignored = False
-        pycache_ignored = False
+        git_dir = PROJECT_ROOT / ".git"
+        if git_dir.exists():
+            gitignore_path = PROJECT_ROOT / ".gitignore"
+            ai_ignored = False
+            pycache_ignored = False
 
-        if gitignore_path.exists():
-            content = gitignore_path.read_text()
-            if ".ai/" in content or ".ai" in content:
-                ai_ignored = True
-            if "__pycache__" in content:
-                pycache_ignored = True
+            if gitignore_path.exists():
+                content = gitignore_path.read_text()
+                if ".ai/" in content or ".ai" in content:
+                    ai_ignored = True
+                if "__pycache__" in content:
+                    pycache_ignored = True
 
-            if not ai_ignored or not pycache_ignored:
-                with open(gitignore_path, "a") as f:
-                    if not content.endswith("\n") and content:
-                        f.write("\n")
-                    if not ai_ignored:
-                        f.write(".ai/\n")
-                        log("Added .ai/ to .gitignore")
-                    if not pycache_ignored:
-                        f.write("__pycache__/\n")
-                        log("Added __pycache__/ to .gitignore")
-        else:
-            with open(gitignore_path, "w") as f:
-                f.write(".ai/\n__pycache__/\n")
-            log("Created .gitignore with .ai/ and __pycache__/")
+                if not ai_ignored or not pycache_ignored:
+                    with open(gitignore_path, "a") as f:
+                        if not content.endswith("\n") and content:
+                            f.write("\n")
+                        if not ai_ignored:
+                            f.write(".ai/\n")
+                            log("Added .ai/ to .gitignore")
+                        if not pycache_ignored:
+                            f.write("__pycache__/\n")
+                            log("Added __pycache__/ to .gitignore")
+            else:
+                with open(gitignore_path, "w") as f:
+                    f.write(".ai/\n__pycache__/\n")
+                log("Created .gitignore with .ai/ and __pycache__/")
     except (OSError, PermissionError) as e:
         log(f"Warning: Could not modify .gitignore: {e}")
 
@@ -92,7 +95,21 @@ def startup_check() -> None:
         log(f"Warning: Could not create {MEMORY_FILE}: {e}")
 
 
-startup_check()
+_startup_done = False
+_startup_lock = threading.Lock()
+
+
+def ensure_startup() -> None:
+    """Performs startup initialization if not already done."""
+    global _startup_done
+    if _startup_done:
+        return
+    with _startup_lock:
+        if _startup_done:
+            return
+        startup_check()
+        _startup_done = True
+
 
 mcp = FastMCP("ProjectMind")
 
@@ -216,20 +233,18 @@ def ingest_git_history(limit: int = 30) -> str:
     except GitError as e:
         return str(e)
 
-    if not MEMORY_FILE.exists():
+    ctx = get_context()
+    current_memory = ctx.memory_manager.read(max_lines=None)
+    if current_memory == "Memory file not found.":
         return "Memory file not found."
 
     try:
-        current_memory = MEMORY_FILE.read_text()
-
         header = "## Development Log (Git)"
         if header not in current_memory:
-            with open(MEMORY_FILE, "a") as f:
-                f.write(f"\n\n{header}\n")
-            current_memory += f"\n\n{header}\n"
+            ctx.memory_manager.update("", section="Development Log (Git)")
+            current_memory = ctx.memory_manager.read(max_lines=None)
 
         new_entries = []
-
         for commit in commits:
             if commit.short_hash in current_memory:
                 continue
@@ -242,10 +257,8 @@ def ingest_git_history(limit: int = 30) -> str:
             return "No new commits found to ingest."
 
         new_entries.reverse()
-
-        with open(MEMORY_FILE, "a") as f:
-            for entry in new_entries:
-                f.write(f"{entry}\n")
+        entries_text = "\n".join(new_entries)
+        ctx.memory_manager.update(entries_text, section="Development Log (Git)")
 
         return f"Ingested {len(new_entries)} new commits into memory."
     except Exception as e:
@@ -290,12 +303,11 @@ def generate_project_summary() -> str:
             pass
 
         root = PROJECT_ROOT
-        ignored_dirs = get_ignored_dirs()
         py_files = 0
         js_files = 0
 
         for _root_path, dirs, files in os.walk(root):
-            dirs[:] = [d for d in dirs if d not in ignored_dirs]
+            dirs[:] = [d for d in dirs if not is_dir_ignored(d)]
             for file in files:
                 if file.endswith(".py"):
                     py_files += 1
@@ -394,14 +406,13 @@ def analyze_project_structure() -> str:
 
     try:
         root = PROJECT_ROOT
-        ignored_dirs = get_ignored_dirs()
 
         structure = []
         structure.append("# PROJECT STRUCTURE\n")
 
         dirs_by_depth = {}
         for item in root.iterdir():
-            if item.is_dir() and item.name not in ignored_dirs:
+            if item.is_dir() and not is_dir_ignored(item.name):
                 try:
                     count = sum(1 for _ in item.rglob("*") if _.is_file())
                     dirs_by_depth[item.name] = count
@@ -416,7 +427,7 @@ def analyze_project_structure() -> str:
 
         file_types: dict[str, int] = {}
         for _root_path, dirs, files in os.walk(root):
-            dirs[:] = [d for d in dirs if d not in ignored_dirs]
+            dirs[:] = [d for d in dirs if not is_dir_ignored(d)]
 
             for file in files:
                 ext = Path(file).suffix
@@ -450,7 +461,7 @@ def analyze_project_structure() -> str:
             "Dockerfile",
             ".env.example",
         ]:
-            if Path(cfg).exists():
+            if (root / cfg).exists():
                 config_files.append(cfg)
 
         if config_files:
@@ -541,8 +552,9 @@ def should_include_search_result(
             return False
 
     if exclude_dirs:
+        source_parts = Path(source).parts
         for exc_dir in exclude_dirs:
-            if exc_dir in source:
+            if exc_dir in source_parts:
                 return False
 
     return True
@@ -598,7 +610,7 @@ def search_codebase_advanced(
                 source = meta.get("source", "unknown")
                 distance = results.get("distances", [[]])[0][i] if "distances" in results else 0
 
-                relevance = 1 - (distance / 2)
+                relevance = max(0.0, 1.0 - (distance / 2.0))
 
                 if should_include_search_result(
                     source, relevance, file_types, exclude_dirs, min_relevance
@@ -669,8 +681,10 @@ def analyze_code_complexity(target_path: str = ".") -> str:
         results.append("# CODE COMPLEXITY ANALYSIS\n")
 
         py_files = list(target.rglob("*.py"))
-        ignored_dirs = get_ignored_dirs()
-        py_files = [f for f in py_files if not any(ig in str(f) for ig in ignored_dirs)]
+        py_files = [
+            f for f in py_files
+            if not any(is_dir_ignored(p) for p in f.relative_to(target).parts[:-1])
+        ]
 
         if not py_files:
             return "No Python files found"
@@ -728,8 +742,10 @@ def analyze_code_quality(target_path: str = ".", max_files: int = 10) -> str:
             return f"Path not found: {target_path}"
 
         py_files = list(target.rglob("*.py"))
-        ignored_dirs = get_ignored_dirs()
-        py_files = [f for f in py_files if not any(ig in str(f) for ig in ignored_dirs)]
+        py_files = [
+            f for f in py_files
+            if not any(is_dir_ignored(p) for p in f.relative_to(target).parts[:-1])
+        ]
 
         if not py_files:
             return "No Python files found"
@@ -745,26 +761,29 @@ def analyze_code_quality(target_path: str = ".", max_files: int = 10) -> str:
         for py_file in files_to_check:
             try:
                 old_stdout = sys.stdout
+                old_stderr = sys.stderr
                 sys.stdout = StringIO()
+                sys.stderr = StringIO()
 
-                pylint_output = Run([str(py_file), "--output-format=text"], exit=False)
+                try:
+                    pylint_output = Run([str(py_file), "--output-format=text"], exit=False)
+                finally:
+                    sys.stdout = old_stdout
+                    sys.stderr = old_stderr
 
-                sys.stdout = old_stdout
-
-                if hasattr(pylint_output.linter.stats, "by_msg"):
-                    for msg_type in pylint_output.linter.stats.by_msg:
-                        count = pylint_output.linter.stats.by_msg[msg_type]
-                        if "convention" in msg_type.lower():
-                            issues_summary["convention"] += count
-                        elif "refactor" in msg_type.lower():
-                            issues_summary["refactor"] += count
-                        elif "warning" in msg_type.lower():
-                            issues_summary["warning"] += count
-                        elif "error" in msg_type.lower():
-                            issues_summary["error"] += count
+                stats = pylint_output.linter.stats
+                if hasattr(stats, "convention"):
+                    issues_summary["convention"] += stats.convention
+                if hasattr(stats, "refactor"):
+                    issues_summary["refactor"] += stats.refactor
+                if hasattr(stats, "warning"):
+                    issues_summary["warning"] += stats.warning
+                if hasattr(stats, "error"):
+                    issues_summary["error"] += stats.error
 
             except Exception:
                 sys.stdout = old_stdout
+                sys.stderr = old_stderr
                 continue
 
         results.append("## Issues Summary")
@@ -778,7 +797,7 @@ def analyze_code_quality(target_path: str = ".", max_files: int = 10) -> str:
             results.append(f"\n**Total issues found**: {total_issues}")
             results.append("\nRun pylint directly for detailed reports.")
         else:
-            results.append("\n✅ No major issues found!")
+            results.append("\nNo major issues found!")
 
         return "\n".join(results)
     except ValueError as e:
@@ -790,8 +809,8 @@ def analyze_code_quality(target_path: str = ".", max_files: int = 10) -> str:
 @mcp.tool()
 def get_test_coverage_info() -> str:
     try:
-        coverage_file = Path(".coverage")
-        htmlcov_dir = Path("htmlcov")
+        coverage_file = PROJECT_ROOT / ".coverage"
+        htmlcov_dir = PROJECT_ROOT / "htmlcov"
 
         if not coverage_file.exists() and not htmlcov_dir.exists():
             return "No coverage data found. Run: pytest --cov=. --cov-report=html"
@@ -872,4 +891,5 @@ def get_cache_stats() -> str:
 
 
 if __name__ == "__main__":
+    ensure_startup()
     mcp.run()

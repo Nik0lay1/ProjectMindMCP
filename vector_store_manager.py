@@ -59,7 +59,9 @@ class VectorStoreManager:
             logger.info("ChromaDB client initialized")
             self.embedding_fn = LocalSentenceTransformerEmbeddingFunction(MODEL_NAME)
             self.collection = self.chroma_client.get_or_create_collection(
-                name=self.collection_name, embedding_function=self.embedding_fn
+                name=self.collection_name,
+                embedding_function=self.embedding_fn,
+                metadata={"hnsw:space": "cosine"},
             )
 
             self._initialized = True
@@ -94,7 +96,9 @@ class VectorStoreManager:
         try:
             self.chroma_client.delete_collection(self.collection_name)
             self.collection = self.chroma_client.get_or_create_collection(
-                name=self.collection_name, embedding_function=self.embedding_fn
+                name=self.collection_name,
+                embedding_function=self.embedding_fn,
+                metadata={"hnsw:space": "cosine"},
             )
             logger.info(f"Collection '{self.collection_name}' cleared successfully")
             return None

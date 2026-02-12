@@ -144,12 +144,17 @@ class MemoryManager:
             lines = content.split("\n")
             new_lines = []
             skip = False
+            skip_level = 0
 
             for line in lines:
-                if line.startswith("##") and section_name.lower() in line.lower():
+                stripped = line.lstrip("#")
+                current_level = len(line) - len(stripped) if line.startswith("#") else 0
+
+                if current_level == 2 and section_name.lower() in line.lower():
                     skip = True
+                    skip_level = current_level
                     continue
-                elif line.startswith("##") and skip:
+                elif skip and current_level > 0 and current_level <= skip_level:
                     skip = False
 
                 if not skip:

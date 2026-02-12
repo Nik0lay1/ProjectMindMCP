@@ -12,6 +12,7 @@ from config import (
     INDEXABLE_EXTENSIONS,
     get_max_file_size_bytes,
     get_max_memory_bytes,
+    is_dir_ignored,
     safe_read_text,
 )
 from incremental_indexing import IndexMetadata
@@ -119,7 +120,7 @@ class CodebaseIndexer:
                 logger.warning(f"Scan limit reached ({max_files} files). Stopping scan.")
                 break
 
-            dirs[:] = [d for d in dirs if d not in ignored_dirs]
+            dirs[:] = [d for d in dirs if d not in ignored_dirs and not is_dir_ignored(d)]
 
             for file in files:
                 if len(indexable_files) >= max_files:

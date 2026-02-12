@@ -1,6 +1,5 @@
 """Git utilities for ProjectMind MCP Server."""
 
-import os
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
@@ -54,7 +53,11 @@ class GitRepository:
 
     def __init__(self, path: str | None = None):
         self._repo: git.Repo | None = None
-        self._path = path or os.getcwd()
+        if path is None:
+            from config import PROJECT_ROOT
+            self._path = str(PROJECT_ROOT)
+        else:
+            self._path = path
 
     def _get_repo(self) -> git.Repo:
         if self._repo is None:
