@@ -54,8 +54,8 @@ class GitRepository:
     def __init__(self, path: str | None = None):
         self._repo: git.Repo | None = None
         if path is None:
-            from config import PROJECT_ROOT
-            self._path = str(PROJECT_ROOT)
+            import config
+            self._path = str(config.PROJECT_ROOT)
         else:
             self._path = path
 

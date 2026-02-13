@@ -56,19 +56,17 @@ class TestAtomicWrite(unittest.TestCase):
 
 
 class TestIndexMetadata(unittest.TestCase):
-    @patch("incremental_indexing.INDEX_METADATA_FILE")
+    @patch("config.INDEX_METADATA_FILE")
     def test_load_empty_when_file_not_exists(self, mock_file):
-        """Test that empty metadata is loaded when file doesn't exist"""
         mock_file.exists.return_value = False
 
         metadata = IndexMetadata()
 
         self.assertEqual(metadata.metadata, {})
 
-    @patch("incremental_indexing.INDEX_METADATA_FILE")
+    @patch("config.INDEX_METADATA_FILE")
     @patch("builtins.open", new_callable=mock_open, read_data='{"test.py": {"mtime": 123.45}}')
     def test_load_existing_metadata(self, mock_file_open, mock_file):
-        """Test loading existing metadata from file"""
         mock_file.exists.return_value = True
 
         metadata = IndexMetadata()
@@ -76,10 +74,9 @@ class TestIndexMetadata(unittest.TestCase):
         self.assertIn("test.py", metadata.metadata)
         self.assertEqual(metadata.metadata["test.py"]["mtime"], 123.45)
 
-    @patch("incremental_indexing.INDEX_METADATA_FILE")
+    @patch("config.INDEX_METADATA_FILE")
     @patch("builtins.open", side_effect=Exception("Read error"))
     def test_load_handles_error(self, mock_file_open, mock_file):
-        """Test that load handles errors gracefully"""
         mock_file.exists.return_value = True
 
         metadata = IndexMetadata()
@@ -183,9 +180,8 @@ class TestIndexMetadata(unittest.TestCase):
         self.assertEqual(stats["total_files"], 2)
         self.assertEqual(stats["last_index"], "2024-01-01T11:00:00")
 
-    @patch("incremental_indexing.INDEX_METADATA_FILE")
+    @patch("config.INDEX_METADATA_FILE")
     def test_get_stats_empty(self, mock_file):
-        """Test getting stats for empty metadata"""
         mock_file.exists.return_value = False
 
         metadata = IndexMetadata()

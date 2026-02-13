@@ -6,17 +6,15 @@ from time import time
 
 from mcp.server.fastmcp import FastMCP
 
+import config
 from config import (
-    AI_DIR,
-    INDEX_IGNORE_FILE,
-    MEMORY_FILE,
-    PROJECT_ROOT,
     get_file_cache_stats,
     get_ignored_dirs,
     is_dir_ignored,
+    reconfigure,
     validate_path,
 )
-from context import get_context
+from context import get_context, reset_context
 from exceptions import GitError
 from git_utils import GitRepository
 from logger import setup_logger
@@ -32,22 +30,22 @@ def log(message: str) -> None:
 def startup_check() -> None:
     log("=" * 60)
     log("ProjectMind MCP Server Starting...")
-    log(f"Project Root (detected): {PROJECT_ROOT}")
+    log(f"Project Root (detected): {config.PROJECT_ROOT}")
     log(f"Current Working Directory: {Path.cwd()}")
     log(f"MCP Server Location: {Path(__file__).parent}")
     log("=" * 60)
 
     try:
-        if not AI_DIR.exists():
-            AI_DIR.mkdir(parents=True)
-            log(f"Created {AI_DIR}")
+        if not config.AI_DIR.exists():
+            config.AI_DIR.mkdir(parents=True)
+            log(f"Created {config.AI_DIR}")
     except (OSError, PermissionError) as e:
-        log(f"Warning: Could not create {AI_DIR}: {e}. Server will continue if directory exists.")
+        log(f"Warning: Could not create {config.AI_DIR}: {e}. Server will continue if directory exists.")
 
     try:
-        git_dir = PROJECT_ROOT / ".git"
+        git_dir = config.PROJECT_ROOT / ".git"
         if git_dir.exists():
-            gitignore_path = PROJECT_ROOT / ".gitignore"
+            gitignore_path = config.PROJECT_ROOT / ".gitignore"
             ai_ignored = False
             pycache_ignored = False
 
@@ -76,7 +74,7 @@ def startup_check() -> None:
         log(f"Warning: Could not modify .gitignore: {e}")
 
     try:
-        if not MEMORY_FILE.exists():
+        if not config.MEMORY_FILE.exists():
             template = """# Project Memory
 
 ## Status
@@ -89,10 +87,10 @@ def startup_check() -> None:
 ## Recent Decisions
 - Project initialized.
 """
-            MEMORY_FILE.write_text(template)
-            log(f"Created {MEMORY_FILE}")
+            config.MEMORY_FILE.write_text(template)
+            log(f"Created {config.MEMORY_FILE}")
     except (OSError, PermissionError) as e:
-        log(f"Warning: Could not create {MEMORY_FILE}: {e}")
+        log(f"Warning: Could not create {config.MEMORY_FILE}: {e}")
 
 
 _startup_done = False
@@ -114,13 +112,40 @@ def ensure_startup() -> None:
 mcp = FastMCP("ProjectMind")
 
 
+@mcp.tool()
+def set_project_root(path: str) -> str:
+    """
+    Sets the target project root directory.
+    Call this FIRST when working with a project that is not auto-detected.
+
+    Args:
+        path: Absolute path to the project root directory.
+
+    Returns:
+        Confirmation message with the new project root.
+    """
+    global _startup_done
+    target = Path(path).resolve()
+    if not target.exists():
+        return f"Error: Path does not exist: {path}"
+    if not target.is_dir():
+        return f"Error: Path is not a directory: {path}"
+
+    reconfigure(target)
+    reset_context()
+    _startup_done = False
+    ensure_startup()
+    log(f"Project root changed to: {config.PROJECT_ROOT}")
+    return f"Project root set to: {config.PROJECT_ROOT}"
+
+
 def load_index_ignore_patterns() -> set[str]:
-    if not INDEX_IGNORE_FILE.exists():
+    if not config.INDEX_IGNORE_FILE.exists():
         return set()
 
     try:
         patterns = set()
-        with open(INDEX_IGNORE_FILE) as f:
+        with open(config.INDEX_IGNORE_FILE) as f:
             for line in f:
                 line = line.strip()
                 if line and not line.startswith("#"):
@@ -180,7 +205,7 @@ def index_codebase(force: bool = False) -> str:
     if ctx.vector_store.get_collection() is None:
         return "Failed to initialize vector store."
 
-    root_dir = PROJECT_ROOT
+    root_dir = config.PROJECT_ROOT
     ignored_dirs = get_ignored_dirs()
     ignore_patterns = load_index_ignore_patterns()
 
@@ -302,7 +327,7 @@ def generate_project_summary() -> str:
         except GitError:
             pass
 
-        root = PROJECT_ROOT
+        root = config.PROJECT_ROOT
         py_files = 0
         js_files = 0
 
@@ -331,7 +356,7 @@ def extract_tech_stack() -> str:
     try:
         tech_stack = []
 
-        pyproject_path = PROJECT_ROOT / "pyproject.toml"
+        pyproject_path = config.PROJECT_ROOT / "pyproject.toml"
         if pyproject_path.exists():
             content = pyproject_path.read_text()
             tech_stack.append("## Python Project")
@@ -349,7 +374,7 @@ def extract_tech_stack() -> str:
                         if '"' in line:
                             tech_stack.append(f"- {line.strip()}")
 
-        requirements_path = PROJECT_ROOT / "requirements.txt"
+        requirements_path = config.PROJECT_ROOT / "requirements.txt"
         if not tech_stack and requirements_path.exists():
             content = requirements_path.read_text()
             tech_stack.append("## Python Project")
@@ -358,7 +383,7 @@ def extract_tech_stack() -> str:
                 if line.strip() and not line.startswith("#"):
                     tech_stack.append(f"- {line.strip()}")
 
-        package_json_path = PROJECT_ROOT / "package.json"
+        package_json_path = config.PROJECT_ROOT / "package.json"
         if package_json_path.exists():
             import json
 
@@ -372,11 +397,11 @@ def extract_tech_stack() -> str:
                 if len(data["dependencies"]) > 15:
                     tech_stack.append(f"... and {len(data['dependencies']) - 15} more")
 
-        cargo_path = PROJECT_ROOT / "Cargo.toml"
+        cargo_path = config.PROJECT_ROOT / "Cargo.toml"
         if cargo_path.exists():
             tech_stack.append("\n## Rust Project")
 
-        gomod_path = PROJECT_ROOT / "go.mod"
+        gomod_path = config.PROJECT_ROOT / "go.mod"
         if gomod_path.exists():
             tech_stack.append("\n## Go Project")
 
@@ -405,7 +430,7 @@ def analyze_project_structure() -> str:
             return _structure_cache
 
     try:
-        root = PROJECT_ROOT
+        root = config.PROJECT_ROOT
 
         structure = []
         structure.append("# PROJECT STRUCTURE\n")
@@ -516,7 +541,7 @@ def index_changed_files() -> str:
     if ctx.vector_store.get_collection() is None:
         return "Failed to initialize vector store."
 
-    root_dir = PROJECT_ROOT
+    root_dir = config.PROJECT_ROOT
     ignored_dirs = get_ignored_dirs()
     ignore_patterns = load_index_ignore_patterns()
 
@@ -809,8 +834,8 @@ def analyze_code_quality(target_path: str = ".", max_files: int = 10) -> str:
 @mcp.tool()
 def get_test_coverage_info() -> str:
     try:
-        coverage_file = PROJECT_ROOT / ".coverage"
-        htmlcov_dir = PROJECT_ROOT / "htmlcov"
+        coverage_file = config.PROJECT_ROOT / ".coverage"
+        htmlcov_dir = config.PROJECT_ROOT / "htmlcov"
 
         if not coverage_file.exists() and not htmlcov_dir.exists():
             return "No coverage data found. Run: pytest --cov=. --cov-report=html"

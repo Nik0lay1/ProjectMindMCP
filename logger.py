@@ -5,7 +5,7 @@ import logging
 import sys
 from logging.handlers import RotatingFileHandler
 
-from config import AI_DIR, LOG_BACKUP_COUNT, LOG_FILE, LOG_MAX_BYTES
+import config
 
 _logger: logging.Logger | None = None
 
@@ -83,10 +83,10 @@ def setup_logger(name: str = "ProjectMind") -> logging.Logger:
     )
 
     try:
-        AI_DIR.mkdir(parents=True, exist_ok=True)
+        config.AI_DIR.mkdir(parents=True, exist_ok=True)
 
         file_handler = RotatingFileHandler(
-            LOG_FILE, maxBytes=LOG_MAX_BYTES, backupCount=LOG_BACKUP_COUNT, encoding="utf-8"
+            config.LOG_FILE, maxBytes=config.LOG_MAX_BYTES, backupCount=config.LOG_BACKUP_COUNT, encoding="utf-8"
         )
         file_handler.setLevel(logging.DEBUG)
         file_handler.setFormatter(formatter)

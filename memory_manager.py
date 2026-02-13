@@ -3,7 +3,7 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 
-from config import MEMORY_FILE, MEMORY_HISTORY_DIR
+import config
 from logger import get_logger
 
 logger = get_logger()
@@ -15,15 +15,9 @@ class MemoryManager:
     Encapsulates reading, updating, versioning of memory.md file.
     """
 
-    def __init__(self, memory_file: Path = MEMORY_FILE):
-        """
-        Initialize memory manager.
-
-        Args:
-            memory_file: Path to memory file
-        """
-        self.memory_file = memory_file
-        self.history_dir = MEMORY_HISTORY_DIR
+    def __init__(self, memory_file: Path | None = None):
+        self.memory_file = memory_file if memory_file is not None else config.MEMORY_FILE
+        self.history_dir = config.MEMORY_HISTORY_DIR
 
     def read(self, max_lines: int | None = 100) -> str:
         """

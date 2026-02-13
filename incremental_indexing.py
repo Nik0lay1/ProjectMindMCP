@@ -6,7 +6,7 @@ from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 
-from config import INDEX_METADATA_FILE
+import config
 
 if sys.platform == "win32":
     import msvcrt
@@ -87,9 +87,9 @@ class IndexMetadata:
         self.load()
 
     def load(self) -> None:
-        if INDEX_METADATA_FILE.exists():
+        if config.INDEX_METADATA_FILE.exists():
             try:
-                with open(INDEX_METADATA_FILE) as f:
+                with open(config.INDEX_METADATA_FILE) as f:
                     self.metadata = json.load(f)
             except Exception:
                 self.metadata = {}
@@ -107,7 +107,7 @@ class IndexMetadata:
 
         try:
             content = json.dumps(self.metadata, indent=2)
-            atomic_write(INDEX_METADATA_FILE, content)
+            atomic_write(config.INDEX_METADATA_FILE, content)
             logger.debug(f"Metadata saved successfully: {len(self.metadata)} files tracked")
         except Exception as e:
             logger.error(f"Error saving metadata: {e}", exc_info=True)

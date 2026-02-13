@@ -2,8 +2,8 @@ import hashlib
 import json
 from typing import Any
 
+import config
 from cache_manager import TTLCache
-from config import MODEL_NAME, VECTOR_STORE_DIR
 from logger import get_logger
 
 logger = get_logger()
@@ -55,9 +55,9 @@ class VectorStoreManager:
                 def __call__(self, input: list[str]) -> list[list[float]]:  # type: ignore[override]
                     return self.model.encode(input).tolist()  # type: ignore[return-value]
 
-            self.chroma_client = chromadb.PersistentClient(path=str(VECTOR_STORE_DIR))
+            self.chroma_client = chromadb.PersistentClient(path=str(config.VECTOR_STORE_DIR))
             logger.info("ChromaDB client initialized")
-            self.embedding_fn = LocalSentenceTransformerEmbeddingFunction(MODEL_NAME)
+            self.embedding_fn = LocalSentenceTransformerEmbeddingFunction(config.MODEL_NAME)
             self.collection = self.chroma_client.get_or_create_collection(
                 name=self.collection_name,
                 embedding_function=self.embedding_fn,

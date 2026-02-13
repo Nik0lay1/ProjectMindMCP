@@ -1,4 +1,3 @@
 @echo off
-cd /d "%~dp0"
-call .venv\Scripts\activate.bat
-python mcp_server.py %*
+call "%~dp0.venv\Scripts\activate.bat"
+python "%~dp0mcp_server.py" %*
