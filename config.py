@@ -74,6 +74,7 @@ LOG_FILE = AI_DIR / "projectmind.log"
 LOG_MAX_BYTES = 10 * 1024 * 1024
 LOG_BACKUP_COUNT = 5
 
+
 def reconfigure(new_root: Path) -> None:
     global PROJECT_ROOT, AI_DIR, MEMORY_FILE, VECTOR_STORE_DIR
     global INDEX_IGNORE_FILE, INDEX_METADATA_FILE, MEMORY_HISTORY_DIR, LOG_FILE

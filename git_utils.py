@@ -55,6 +55,7 @@ class GitRepository:
         self._repo: git.Repo | None = None
         if path is None:
             import config
+
             self._path = str(config.PROJECT_ROOT)
         else:
             self._path = path
@@ -120,7 +121,9 @@ class GitRepository:
             pass
         return commits
 
-    def get_recently_changed_files(self, days: int = 7, max_files: int = 50) -> dict[str, CommitInfo]:
+    def get_recently_changed_files(
+        self, days: int = 7, max_files: int = 50
+    ) -> dict[str, CommitInfo]:
         repo = self._get_repo()
         result: dict[str, CommitInfo] = {}
         cutoff = datetime.now() - timedelta(days=days)

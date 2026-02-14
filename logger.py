@@ -86,7 +86,10 @@ def setup_logger(name: str = "ProjectMind") -> logging.Logger:
         config.AI_DIR.mkdir(parents=True, exist_ok=True)
 
         file_handler = RotatingFileHandler(
-            config.LOG_FILE, maxBytes=config.LOG_MAX_BYTES, backupCount=config.LOG_BACKUP_COUNT, encoding="utf-8"
+            config.LOG_FILE,
+            maxBytes=config.LOG_MAX_BYTES,
+            backupCount=config.LOG_BACKUP_COUNT,
+            encoding="utf-8",
         )
         file_handler.setLevel(logging.DEBUG)
         file_handler.setFormatter(formatter)

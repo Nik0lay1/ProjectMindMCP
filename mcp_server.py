@@ -40,7 +40,9 @@ def startup_check() -> None:
             config.AI_DIR.mkdir(parents=True)
             log(f"Created {config.AI_DIR}")
     except (OSError, PermissionError) as e:
-        log(f"Warning: Could not create {config.AI_DIR}: {e}. Server will continue if directory exists.")
+        log(
+            f"Warning: Could not create {config.AI_DIR}: {e}. Server will continue if directory exists."
+        )
 
     try:
         git_dir = config.PROJECT_ROOT / ".git"
@@ -505,7 +507,9 @@ def get_file_summary(path: str, max_lines: int = 50) -> str:
             rel_path = str(target.relative_to(config.PROJECT_ROOT)).replace("\\", "/")
             file_commits = git_repo.get_file_commits(rel_path, max_count=5)
             if file_commits:
-                result.append(f"**Last changed**: {file_commits[0].date_str} by {file_commits[0].author}")
+                result.append(
+                    f"**Last changed**: {file_commits[0].date_str} by {file_commits[0].author}"
+                )
                 result.append(f"**Total changes**: {len(file_commits)}+ commits")
         except Exception:
             pass
@@ -558,11 +562,17 @@ def get_file_summary(path: str, max_lines: int = 50) -> str:
         functions = []
         for line in lines:
             stripped = line.strip()
-            if stripped.startswith("import ") or stripped.startswith("const ") and "require(" in stripped:
+            if (
+                stripped.startswith("import ")
+                or stripped.startswith("const ")
+                and "require(" in stripped
+            ):
                 imports.append(stripped[:100])
             elif stripped.startswith("export "):
                 exports.append(stripped[:100])
-            elif "function " in stripped and ("function " == stripped[:9] or "async function" in stripped):
+            elif "function " in stripped and (
+                "function " == stripped[:9] or "async function" in stripped
+            ):
                 functions.append(stripped[:80])
 
         if imports:
@@ -1157,7 +1167,8 @@ def analyze_code_complexity(target_path: str = ".") -> str:
 
         py_files = list(target.rglob("*.py"))
         py_files = [
-            f for f in py_files
+            f
+            for f in py_files
             if not any(is_dir_ignored(p) for p in f.relative_to(target).parts[:-1])
         ]
 
@@ -1218,7 +1229,8 @@ def analyze_code_quality(target_path: str = ".", max_files: int = 10) -> str:
 
         py_files = list(target.rglob("*.py"))
         py_files = [
-            f for f in py_files
+            f
+            for f in py_files
             if not any(is_dir_ignored(p) for p in f.relative_to(target).parts[:-1])
         ]
 
