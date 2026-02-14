@@ -109,3 +109,45 @@ class GitRepository:
 
     def format_author_stats(self, stats: dict[str, int]) -> list[str]:
         return [f"- {author}: {count} commits" for author, count in stats.items()]
+
+    def get_file_commits(self, file_path: str, max_count: int = 5) -> list[CommitInfo]:
+        repo = self._get_repo()
+        commits = []
+        try:
+            for commit in repo.iter_commits(paths=file_path, max_count=max_count):
+                commits.append(CommitInfo.from_commit(commit))
+        except Exception:
+            pass
+        return commits
+
+    def get_recently_changed_files(self, days: int = 7, max_files: int = 50) -> dict[str, CommitInfo]:
+        repo = self._get_repo()
+        result: dict[str, CommitInfo] = {}
+        cutoff = datetime.now() - timedelta(days=days)
+        try:
+            for commit in repo.iter_commits(max_count=200):
+                info = CommitInfo.from_commit(commit)
+                if info.date < cutoff:
+                    break
+                for path in commit.stats.files:
+                    if path not in result:
+                        result[path] = info
+                        if len(result) >= max_files:
+                            return result
+        except Exception:
+            pass
+        return result
+
+    def get_active_branch(self) -> str:
+        try:
+            repo = self._get_repo()
+            return str(repo.active_branch)
+        except Exception:
+            return "unknown"
+
+    def get_total_commit_count(self, max_scan: int = 500) -> int:
+        try:
+            repo = self._get_repo()
+            return sum(1 for _ in repo.iter_commits(max_count=max_scan))
+        except Exception:
+            return 0

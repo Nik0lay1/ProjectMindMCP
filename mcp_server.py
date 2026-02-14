@@ -16,7 +16,7 @@ from config import (
 )
 from context import get_context, reset_context
 from exceptions import GitError
-from git_utils import GitRepository
+from git_utils import CommitInfo, GitRepository
 from logger import setup_logger
 
 logger = setup_logger()
@@ -156,6 +156,61 @@ def load_index_ignore_patterns() -> set[str]:
         return set()
 
 
+def _read_memory_sections() -> dict[str, str]:
+    """Reads memory.md and returns sections as a dict. No vector store needed."""
+    if not config.MEMORY_FILE.exists():
+        return {}
+    try:
+        content = config.MEMORY_FILE.read_text(encoding="utf-8")
+    except Exception:
+        return {}
+
+    sections: dict[str, str] = {}
+    current_section = ""
+    current_lines: list[str] = []
+
+    for line in content.split("\n"):
+        if line.startswith("## "):
+            if current_section:
+                sections[current_section] = "\n".join(current_lines).strip()
+            current_section = line[3:].strip()
+            current_lines = []
+        elif current_section:
+            current_lines.append(line)
+
+    if current_section:
+        sections[current_section] = "\n".join(current_lines).strip()
+
+    return sections
+
+
+def _search_memory_for(keyword: str) -> list[str]:
+    """Searches memory.md for lines mentioning a keyword. No vector store needed."""
+    if not config.MEMORY_FILE.exists():
+        return []
+    try:
+        content = config.MEMORY_FILE.read_text(encoding="utf-8")
+    except Exception:
+        return []
+
+    keyword_lower = keyword.lower()
+    matches = []
+    for line in content.split("\n"):
+        if keyword_lower in line.lower() and line.strip():
+            matches.append(line.strip())
+    return matches
+
+
+def _get_git_repo_safe() -> GitRepository | None:
+    """Returns GitRepository or None if not a git repo. Never raises."""
+    try:
+        repo = GitRepository()
+        repo._get_repo()
+        return repo
+    except Exception:
+        return None
+
+
 @mcp.tool()
 def get_project_overview() -> str:
     """
@@ -170,7 +225,13 @@ def get_project_overview() -> str:
     try:
         root = config.PROJECT_ROOT
         overview = [f"# PROJECT OVERVIEW: {root.name}\n"]
-        overview.append(f"**Root**: `{root}`\n")
+        overview.append(f"**Root**: `{root}`")
+
+        git_repo = _get_git_repo_safe()
+        if git_repo:
+            branch = git_repo.get_active_branch()
+            total = git_repo.get_total_commit_count()
+            overview.append(f"**Git**: branch `{branch}`, {total}+ commits")
 
         config_files = []
         tech_hints = []
@@ -195,9 +256,22 @@ def get_project_overview() -> str:
                     tech_hints.append(label)
 
         if tech_hints:
-            overview.append(f"**Tech**: {', '.join(tech_hints)}\n")
+            overview.append(f"**Tech**: {', '.join(tech_hints)}")
 
-        overview.append("## Root Directories")
+        memory_sections = _read_memory_sections()
+        if "Tech Stack" in memory_sections and memory_sections["Tech Stack"]:
+            overview.append("\n## Tech Stack (from memory)")
+            for line in memory_sections["Tech Stack"].split("\n")[:10]:
+                if line.strip():
+                    overview.append(line)
+
+        if "Status" in memory_sections and memory_sections["Status"]:
+            overview.append("\n## Status (from memory)")
+            for line in memory_sections["Status"].split("\n")[:10]:
+                if line.strip():
+                    overview.append(line)
+
+        overview.append("\n## Root Directories")
         try:
             dirs = []
             files_at_root = 0
@@ -232,6 +306,24 @@ def get_project_overview() -> str:
             overview.append("\n## Config Files")
             for cfg in config_files:
                 overview.append(f"- `{cfg}`")
+
+        if git_repo:
+            try:
+                commits = git_repo.get_commits(max_count=5, since_days=7)
+                if commits:
+                    overview.append("\n## Recent Activity (last 7 days)")
+                    for c in commits:
+                        overview.append(f"- {c.date_short} [{c.short_hash}]: {c.first_line}")
+            except GitError:
+                pass
+
+        recent_decisions = memory_sections.get("Recent Decisions", "")
+        if recent_decisions:
+            decision_lines = [ln for ln in recent_decisions.split("\n") if ln.strip()][:5]
+            if decision_lines:
+                overview.append("\n## Recent Decisions (from memory)")
+                for line in decision_lines:
+                    overview.append(line)
 
         overview.append(
             "\n*Use `explore_directory(path)` to drill into specific directories, "
@@ -278,6 +370,14 @@ def explore_directory(path: str = ".", depth: int = 1, max_items: int = 100) -> 
     if not target.is_dir():
         return f"Not a directory: {path}"
 
+    git_repo = _get_git_repo_safe()
+    recently_changed: dict[str, CommitInfo] = {}
+    if git_repo:
+        try:
+            recently_changed = git_repo.get_recently_changed_files(days=14)
+        except Exception:
+            pass
+
     try:
         rel = target.relative_to(config.PROJECT_ROOT)
         header = str(rel) if str(rel) != "." else config.PROJECT_ROOT.name
@@ -286,6 +386,18 @@ def explore_directory(path: str = ".", depth: int = 1, max_items: int = 100) -> 
 
     lines = [f"# {header}/\n"]
     count = [0]
+
+    def _format_git_hint(entry_path: Path) -> str:
+        if not recently_changed:
+            return ""
+        try:
+            rel_path = str(entry_path.relative_to(config.PROJECT_ROOT)).replace("\\", "/")
+        except ValueError:
+            return ""
+        if rel_path in recently_changed:
+            ci = recently_changed[rel_path]
+            return f"  [changed {ci.date_short}: {ci.first_line[:40]}]"
+        return ""
 
     def _walk(dir_path: Path, prefix: str, current_depth: int) -> None:
         if count[0] >= max_items:
@@ -328,13 +440,20 @@ def explore_directory(path: str = ".", depth: int = 1, max_items: int = 100) -> 
                     size_str = f"{size / 1024 / 1024:.1f}MB"
             except OSError:
                 size_str = "?"
-            lines.append(f"{prefix}{f.name}  ({size_str})")
+            git_hint = _format_git_hint(f)
+            lines.append(f"{prefix}{f.name}  ({size_str}){git_hint}")
             count[0] += 1
 
     _walk(target, "", 1)
 
     if count[0] == 0:
         lines.append("(empty directory)")
+
+    memory_mentions = _search_memory_for(header.split("/")[-1] if "/" in header else header)
+    if memory_mentions:
+        lines.append("\n## Notes from memory")
+        for mention in memory_mentions[:5]:
+            lines.append(f"- {mention}")
 
     return "\n".join(lines)
 
@@ -379,6 +498,17 @@ def get_file_summary(path: str, max_lines: int = 50) -> str:
     result.append(f"**Path**: `{target.relative_to(config.PROJECT_ROOT)}`")
     result.append(f"**Size**: {size_kb:.1f} KB")
     result.append(f"**Extension**: `{target.suffix}`")
+
+    git_repo = _get_git_repo_safe()
+    if git_repo:
+        try:
+            rel_path = str(target.relative_to(config.PROJECT_ROOT)).replace("\\", "/")
+            file_commits = git_repo.get_file_commits(rel_path, max_count=5)
+            if file_commits:
+                result.append(f"**Last changed**: {file_commits[0].date_str} by {file_commits[0].author}")
+                result.append(f"**Total changes**: {len(file_commits)}+ commits")
+        except Exception:
+            pass
 
     if target.suffix in config.BINARY_EXTENSIONS:
         result.append("\n(binary file — no preview)")
@@ -443,6 +573,23 @@ def get_file_summary(path: str, max_lines: int = 50) -> str:
             result.append(f"\n**Exports** ({len(exports)}):")
             for exp in exports[:10]:
                 result.append(f"  - `{exp}`")
+
+    if git_repo:
+        try:
+            rel_path = str(target.relative_to(config.PROJECT_ROOT)).replace("\\", "/")
+            file_commits = git_repo.get_file_commits(rel_path, max_count=5)
+            if file_commits:
+                result.append("\n## Git History")
+                for c in file_commits:
+                    result.append(f"- {c.date_str} [{c.short_hash}] {c.first_line} ({c.author})")
+        except Exception:
+            pass
+
+    memory_mentions = _search_memory_for(target.name)
+    if memory_mentions:
+        result.append("\n## Notes from memory")
+        for mention in memory_mentions[:5]:
+            result.append(f"- {mention}")
 
     if max_lines > 0:
         preview_lines = lines[:max_lines]
