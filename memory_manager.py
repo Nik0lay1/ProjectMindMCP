@@ -144,7 +144,7 @@ class MemoryManager:
                 stripped = line.lstrip("#")
                 current_level = len(line) - len(stripped) if line.startswith("#") else 0
 
-                if current_level == 2 and section_name.lower() in line.lower():
+                if current_level >= 2 and section_name.lower() in line.lower():
                     skip = True
                     skip_level = current_level
                     continue
