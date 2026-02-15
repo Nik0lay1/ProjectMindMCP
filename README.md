@@ -76,7 +76,7 @@ ProjectMind is a standalone MCP server that gives AI coding assistants **persist
 
 **Quick Links:**
 - 🚀 **[Getting Started Guide](docs/guides/getting-started.md)** - Installation, setup, first steps
-- 📖 **[Complete API Reference](docs/api/tools-reference.md)** - All 25 tools with examples
+- 📖 **[Complete API Reference](docs/api/tools-reference.md)** - All 29 tools with examples
 - 💡 **[Advanced Usage Guide](docs/guides/advanced-usage.md)** - Power features and workflows
 - 📁 **[Full Documentation](docs/)** - Complete documentation index
 
@@ -415,6 +415,189 @@ Provides summary of recent development activity:
 - `days`: Period to analyze (1-365, default 7)
 
 **Use case:** Catch up after being away from project.
+
+### Code Intelligence & Conventions 🆕 (v0.6.0)
+
+These tools provide deep code analysis without requiring ML or vector store initialization.
+
+#### `detect_project_conventions()`
+Auto-detects project conventions from codebase analysis:
+- **Naming style**: snake_case, camelCase, kebab-case detection
+- **Test framework**: pytest, jest, vitest, mocha auto-detection
+- **Test patterns**: test_*.py, *.spec.js, etc.
+- **Linting & formatting**: ruff, black, eslint, prettier
+- **Type checking**: mypy, TypeScript detection
+- **Frameworks**: React, Next.js, FastAPI, Django, etc.
+- **Error handling & logging patterns**
+- **Architecture**: monorepo, microservices, src/ structure
+
+**Use case:** Understand project conventions before making changes, onboard new developers.
+
+```
+# PROJECT CONVENTIONS
+
+**Primary Language**: Python
+**Frameworks**: FastAPI, SQLAlchemy
+**Architecture**: src/ directory, monorepo (packages/)
+
+## Naming & Style
+- **File naming**: snake_case (142/180 files)
+- **Formatting**: black, isort
+- **Linting**: ruff, pylint
+- **Type checking**: mypy
+
+## Testing
+- **Framework**: pytest
+- **Pattern**: test_*.py (in: tests/)
+```
+
+#### `get_file_relations(path: str)`
+Shows import relationships and impact for a specific file:
+- **Imports from**: What this file imports (local files)
+- **Imported by**: What files depend on this file
+- **Related tests**: Test files for this module
+- **Impact assessment**: LOW/MEDIUM/HIGH based on dependents
+
+**Use case:** Understand file dependencies before refactoring, find what breaks when you change a file.
+
+```
+# FILE RELATIONS: src/auth/service.py
+
+## Imports From (3)
+- `src/auth/models.py`
+- `src/database/session.py`
+- `src/utils/crypto.py`
+
+## Imported By (5)
+- `src/api/auth_routes.py`
+- `src/api/user_routes.py`
+- `src/background/tasks.py`
+
+## Related Tests (2)
+- `tests/auth/test_service.py`
+- `tests/integration/test_auth_flow.py`
+
+**Impact**: MEDIUM — 5 files depend on this module
+```
+
+#### `find_todos(tag: str | None = None)`
+Scans codebase for TODO, FIXME, HACK, BUG, XXX comments:
+- `tag`: Optional filter ("TODO", "FIXME", etc.) - default: all tags
+- Shows file locations and line numbers
+- Grouped by tag type and file
+
+**Use case:** Track technical debt, find unfinished work, identify areas needing attention.
+
+```
+# CODEBASE TODOs (47 total)
+
+## Summary
+- **TODO**: 32
+- **FIXME**: 10
+- **HACK**: 5
+
+## By File (top 10)
+- `src/api/routes.py`: 8 items
+- `src/services/payment.py`: 5 items
+
+## All Items
+
+### `src/api/routes.py`
+- **TODO** (line 45): Add rate limiting to all endpoints
+- **FIXME** (line 120): Handle timeout errors properly
+```
+
+#### `check_dependencies()`
+Analyzes dependency health across multiple ecosystems:
+- **Python**: pyproject.toml, requirements.txt
+- **JavaScript/Node**: package.json
+- **Go**: go.mod
+- **Rust**: Cargo.toml
+
+Reports:
+- Total dependencies (production vs dev)
+- Version pinning strategy (pinned ==, ranged, unpinned)
+- Duplicates between dependency files
+- Lock file presence
+- Version constraint patterns (^, ~, exact)
+
+**Use case:** Audit dependencies, find version conflicts, ensure reproducible builds.
+
+```
+# DEPENDENCY HEALTH CHECK
+
+## Python Dependencies (pyproject.toml)
+**Total**: 15
+
+**Pinned** (==): 3
+**Ranged**: 10
+**Unpinned/loose**: 2
+
+**Duplicates found**: requests, pytest
+
+### All Dependencies
+- **fastapi** `>=0.100.0`
+- **pydantic** `>=2.0.0,<3.0.0`
+...
+
+## JavaScript/Node.js Dependencies (package.json)
+**Total**: 42 (28 prod, 14 dev)
+**Version strategy**: ^minor: 35, ~patch: 5, exact: 2
+**Lock file**: package-lock.json
+```
+
+#### `analyze_change_impact(path: str)`
+Predicts what breaks if you change a file:
+- **Direct dependents**: Files that directly import this file
+- **Transitive impact**: Full dependency chain (BFS traversal)
+- **Tests to run**: All related test files
+- **Risk assessment**: MINIMAL/LOW/MEDIUM/HIGH/CRITICAL
+
+**Use case:** Impact analysis before refactoring, identify test coverage gaps.
+
+```
+# CHANGE IMPACT ANALYSIS: `src/database/models.py`
+
+## Direct Dependents (8)
+- `src/api/user_routes.py`
+- `src/api/post_routes.py`
+- `src/services/user_service.py`
+
+## Transitive Impact (15 more)
+- `src/api/admin_routes.py`
+- `src/background/sync_task.py`
+
+## Tests to Run (6)
+- `tests/models/test_user.py`
+- `tests/api/test_user_routes.py`
+
+## Risk Assessment
+- **Impact level**: HIGH
+- **Total affected files**: 23
+- **Direct dependents**: 8
+- **Transitive dependents**: 15
+- **Related tests**: 6
+
+*This file has wide impact. Consider thorough testing and careful review.*
+```
+
+#### `save_conventions_to_memory()`
+Detects project conventions and automatically saves them to memory.md:
+- Runs `detect_project_conventions()` internally
+- Saves to "Project Conventions" section in memory
+- Persists conventions for future AI assistant context
+
+**Use case:** One-time setup to give AI persistent knowledge of your project's conventions.
+
+#### `project_onboarding()`
+One-command comprehensive project briefing:
+- Runs `get_project_overview()`
+- Detects and saves conventions
+- Analyzes dependencies
+- Scans for TODOs
+- Auto-saves key info to memory
+
+**Use case:** Complete onboarding for new team members or AI assistants in one command.
 
 ### Git Integration
 

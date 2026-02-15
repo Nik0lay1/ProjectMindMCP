@@ -1,5 +1,37 @@
 # Changelog
 
+## [0.6.0] - 2026-02-15 🧠 CODE INTELLIGENCE & ADVANCED ANALYSIS
+
+### Added
+- **Code Intelligence Module** (`code_intelligence.py`)
+  - **`detect_project_conventions()`** - Auto-detects naming style, test patterns, frameworks, linting/formatting tools, error handling, logging, and architecture from codebase
+  - **`get_file_relations(path)`** - Shows import relationships (what file imports, what imports it), related tests, and impact assessment
+  - **`find_todos(tag=None)`** - Scans codebase for TODO, FIXME, HACK, BUG, XXX comments with file locations and line numbers
+
+- **Dependency Analysis**
+  - **`check_dependencies()`** - Analyzes dependency health across Python (pyproject.toml, requirements.txt), JavaScript (package.json), Go (go.mod), and Rust (Cargo.toml)
+  - Reports total dependencies, version pinning strategies, duplicates, and lock file status
+  - Detects caret (^), tilde (~), and exact version constraints
+
+- **Change Impact Analysis**
+  - **`analyze_change_impact(path)`** - Predicts what breaks if you change a file
+  - Uses import graph to find direct and transitive dependents
+  - Identifies related tests to run
+  - Provides risk assessment (MINIMAL/LOW/MEDIUM/HIGH/CRITICAL)
+
+- **Memory Integration**
+  - **`save_conventions_to_memory()`** - Detects conventions and auto-saves to memory.md
+  - **`project_onboarding()`** - One-command full project briefing combining overview + conventions + dependencies + TODOs
+  - Auto-saves conventions and dependencies to memory for persistent context
+
+### Technical Details
+- All new tools use static analysis (no ML/vector store required)
+- Import graph built with BFS for transitive dependency tracking
+- Supports Python, JavaScript/TypeScript, Go, and Rust ecosystems
+- ~940 lines of new code in `code_intelligence.py`
+- Total tools increased from 22 to 29
+- All tests passing, black formatting compliant
+
 ## [0.5.6] - 2026-02-09 🛠️ STABILITY & PERFORMANCE FIXES
 
 ### Fixed
