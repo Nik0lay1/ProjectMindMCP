@@ -685,6 +685,157 @@ def find_todos(tag: str | None = None) -> str:
         return f"Error scanning TODOs: {e}"
 
 
+@mcp.tool()
+def check_dependencies() -> str:
+    """
+    Analyzes project dependencies: versions, pinning strategy, duplicates, lock files.
+    Supports Python (pyproject.toml, requirements.txt), JS (package.json),
+    Go (go.mod), and Rust (Cargo.toml). No indexing required.
+
+    Returns:
+        Dependency health report with version analysis.
+    """
+    ensure_startup()
+    try:
+        from code_intelligence import check_dependencies as _check_deps
+
+        return _check_deps(config.PROJECT_ROOT)
+    except Exception as e:
+        return f"Error checking dependencies: {e}"
+
+
+@mcp.tool()
+def analyze_change_impact(path: str) -> str:
+    """
+    Predicts what breaks if you change a file. Uses import graph to find
+    direct dependents, transitive impact, and related tests to run.
+
+    Args:
+        path: File path relative to project root.
+
+    Returns:
+        Impact analysis with risk assessment and test recommendations.
+    """
+    ensure_startup()
+    try:
+        target = validate_path(path)
+    except ValueError as e:
+        return f"Error: {e}"
+
+    if not target.exists():
+        return f"File not found: {path}"
+    if not target.is_file():
+        return f"Not a file: {path}"
+
+    try:
+        from code_intelligence import analyze_change_impact as _analyze_impact
+
+        rel_path = str(target.relative_to(config.PROJECT_ROOT)).replace("\\", "/")
+        return _analyze_impact(rel_path, config.PROJECT_ROOT)
+    except Exception as e:
+        return f"Error analyzing impact: {e}"
+
+
+@mcp.tool()
+def save_conventions_to_memory() -> str:
+    """
+    Detects project conventions and saves them to memory.md automatically.
+    This persists conventions so AI assistants have context without re-scanning.
+
+    Returns:
+        Confirmation with summary of what was saved.
+    """
+    ensure_startup()
+    try:
+        from code_intelligence import detect_conventions
+
+        report = detect_conventions(config.PROJECT_ROOT)
+        ctx = get_context()
+        ctx.memory_manager.update(report, section="Project Conventions")
+        return f"Conventions saved to memory.\n\n{report}"
+    except Exception as e:
+        return f"Error saving conventions: {e}"
+
+
+@mcp.tool()
+def project_onboarding() -> str:
+    """
+    One-command full project briefing. Runs overview + conventions + dependencies +
+    TODOs and compiles a comprehensive brief for onboarding a new developer or AI.
+    Results are saved to memory for future reference.
+
+    Returns:
+        Complete project brief.
+    """
+    ensure_startup()
+    try:
+        brief_parts: list[str] = []
+
+        brief_parts.append(get_project_overview())
+        brief_parts.append("")
+
+        try:
+            from code_intelligence import detect_conventions
+
+            conventions = detect_conventions(config.PROJECT_ROOT)
+            brief_parts.append(conventions)
+            brief_parts.append("")
+        except Exception:
+            pass
+
+        try:
+            from code_intelligence import check_dependencies as _check_deps
+
+            deps = _check_deps(config.PROJECT_ROOT)
+            if "No dependency files" not in deps:
+                brief_parts.append(deps)
+                brief_parts.append("")
+        except Exception:
+            pass
+
+        try:
+            from code_intelligence import extract_todos
+
+            todos = extract_todos(config.PROJECT_ROOT, max_files=2000)
+            if "No TODO" not in todos:
+                brief_parts.append(todos)
+                brief_parts.append("")
+        except Exception:
+            pass
+
+        full_brief = "\n".join(brief_parts)
+
+        try:
+            ctx = get_context()
+            summary_lines = ["Auto-generated project onboarding brief."]
+
+            try:
+                from code_intelligence import detect_conventions
+
+                conv = detect_conventions(config.PROJECT_ROOT)
+                ctx.memory_manager.update(conv, section="Project Conventions")
+            except Exception:
+                pass
+
+            try:
+                from code_intelligence import check_dependencies as _check_deps
+
+                deps = _check_deps(config.PROJECT_ROOT)
+                if "No dependency files" not in deps:
+                    ctx.memory_manager.update(deps, section="Dependencies")
+            except Exception:
+                pass
+
+            summary_lines.append("Conventions and dependencies saved to memory.")
+            ctx.memory_manager.update("\n".join(summary_lines), section="Onboarding")
+        except Exception:
+            pass
+
+        return full_brief
+    except Exception as e:
+        return f"Error during onboarding: {e}"
+
+
 @mcp.resource("project://memory")
 def get_project_memory() -> str:
     ctx = get_context()

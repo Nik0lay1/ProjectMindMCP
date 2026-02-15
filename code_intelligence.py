@@ -1,5 +1,6 @@
-"""Static code intelligence: conventions, import graph, TODOs. No ML dependencies."""
+"""Static code intelligence: conventions, import graph, TODOs, dependencies. No ML dependencies."""
 
+import json
 import os
 import re
 from collections import Counter
@@ -592,5 +593,349 @@ def extract_todos(root: Path, max_files: int = 3000, tag_filter: str | None = No
             lines.append(f"\n### `{current_file}`")
         text_preview = todo.text[:120] if todo.text else "(no description)"
         lines.append(f"- **{todo.tag}** (line {todo.line_no}): {text_preview}")
+
+    return "\n".join(lines)
+
+
+def check_dependencies(root: Path) -> str:
+    """Parses dependency files and reports versions, duplicates, potential issues."""
+    sections: list[str] = []
+
+    py_deps = _check_python_deps(root)
+    if py_deps:
+        sections.append(py_deps)
+
+    js_deps = _check_js_deps(root)
+    if js_deps:
+        sections.append(js_deps)
+
+    go_deps = _check_go_deps(root)
+    if go_deps:
+        sections.append(go_deps)
+
+    rust_deps = _check_rust_deps(root)
+    if rust_deps:
+        sections.append(rust_deps)
+
+    if not sections:
+        return "No dependency files found (pyproject.toml, requirements.txt, package.json, go.mod, Cargo.toml)."
+
+    header = "# DEPENDENCY HEALTH CHECK\n"
+    return header + "\n\n".join(sections)
+
+
+def _parse_pyproject_deps(content: str) -> list[tuple[str, str]]:
+    deps: list[tuple[str, str]] = []
+    in_deps = False
+    for line in content.split("\n"):
+        stripped = line.strip()
+        if stripped.startswith("dependencies") and "=" in stripped:
+            in_deps = True
+            continue
+        if in_deps:
+            if stripped.startswith("]"):
+                break
+            match = re.search(r'"([^"]+)"', stripped)
+            if match:
+                raw = match.group(1)
+                parts = re.split(r"[>=<!\s;]", raw, maxsplit=1)
+                name = parts[0].strip()
+                version = raw[len(name) :].strip() if len(parts) > 0 else ""
+                deps.append((name, version))
+    return deps
+
+
+def _check_python_deps(root: Path) -> str | None:
+    deps: list[tuple[str, str]] = []
+    source = ""
+
+    pyproject = root / "pyproject.toml"
+    if pyproject.exists():
+        try:
+            content = safe_read_text(pyproject)
+            deps = _parse_pyproject_deps(content)
+            source = "pyproject.toml"
+        except Exception:
+            pass
+
+    req_file = root / "requirements.txt"
+    if req_file.exists():
+        try:
+            content = safe_read_text(req_file)
+            for line in content.split("\n"):
+                line = line.strip()
+                if not line or line.startswith("#") or line.startswith("-"):
+                    continue
+                parts = re.split(r"[>=<!\s]", line, maxsplit=1)
+                name = parts[0].strip()
+                version = line[len(name) :].strip() if len(parts) > 0 else ""
+                deps.append((name, version))
+            source = source + " + requirements.txt" if source else "requirements.txt"
+        except Exception:
+            pass
+
+    if not deps:
+        return None
+
+    lines = [f"## Python Dependencies ({source})"]
+    lines.append(f"**Total**: {len(deps)}\n")
+
+    unpinned = [(n, v) for n, v in deps if not v or v.startswith(">=") or v.startswith(">")]
+    pinned = [(n, v) for n, v in deps if v and v.startswith("==")]
+    ranged = [(n, v) for n, v in deps if v and not v.startswith("==") and v not in ("", ">", ">=")]
+
+    if pinned:
+        lines.append(f"**Pinned** (==): {len(pinned)}")
+    if ranged:
+        lines.append(f"**Ranged**: {len(ranged)}")
+    if unpinned:
+        lines.append(f"**Unpinned/loose**: {len(unpinned)}")
+
+    names = [n.lower() for n, _ in deps]
+    dupes = [n for n, c in Counter(names).items() if c > 1]
+    if dupes:
+        lines.append(f"\n**Duplicates found**: {', '.join(dupes)}")
+
+    lines.append("\n### All Dependencies")
+    for name, version in sorted(deps, key=lambda x: x[0].lower()):
+        v_str = f" `{version}`" if version else " *(no version constraint)*"
+        lines.append(f"- **{name}**{v_str}")
+
+    return "\n".join(lines)
+
+
+def _check_js_deps(root: Path) -> str | None:
+    pkg_file = root / "package.json"
+    if not pkg_file.exists():
+        return None
+
+    try:
+        content = safe_read_text(pkg_file)
+        data = json.loads(content)
+    except Exception:
+        return None
+
+    prod_deps: dict[str, str] = data.get("dependencies", {})
+    dev_deps: dict[str, str] = data.get("devDependencies", {})
+    peer_deps: dict[str, str] = data.get("peerDependencies", {})
+
+    if not prod_deps and not dev_deps:
+        return None
+
+    lines = ["## JavaScript/Node.js Dependencies (package.json)"]
+    total = len(prod_deps) + len(dev_deps)
+    lines.append(f"**Total**: {total} ({len(prod_deps)} prod, {len(dev_deps)} dev)")
+    if peer_deps:
+        lines.append(f"**Peer**: {len(peer_deps)}")
+
+    all_names = list(prod_deps.keys()) + list(dev_deps.keys())
+    dupes = [n for n, c in Counter(all_names).items() if c > 1]
+    if dupes:
+        lines.append(f"\n**In both prod & dev**: {', '.join(dupes)}")
+
+    all_versions = {**prod_deps, **dev_deps}
+    caret = sum(1 for v in all_versions.values() if v.startswith("^"))
+    tilde = sum(1 for v in all_versions.values() if v.startswith("~"))
+    exact = sum(1 for v in all_versions.values() if v and v[0].isdigit())
+
+    if caret or tilde or exact:
+        parts = []
+        if caret:
+            parts.append(f"^minor: {caret}")
+        if tilde:
+            parts.append(f"~patch: {tilde}")
+        if exact:
+            parts.append(f"exact: {exact}")
+        lines.append(f"**Version strategy**: {', '.join(parts)}")
+
+    if prod_deps:
+        lines.append("\n### Production")
+        for name in sorted(prod_deps.keys()):
+            lines.append(f"- **{name}**: `{prod_deps[name]}`")
+    if dev_deps:
+        lines.append("\n### Development")
+        for name in sorted(dev_deps.keys()):
+            lines.append(f"- **{name}**: `{dev_deps[name]}`")
+
+    lock_files = []
+    for lf in ("package-lock.json", "yarn.lock", "pnpm-lock.yaml", "bun.lockb"):
+        if (root / lf).exists():
+            lock_files.append(lf)
+    if lock_files:
+        lines.append(f"\n**Lock file**: {', '.join(lock_files)}")
+    else:
+        lines.append("\n**Lock file**: MISSING (recommend running npm install / yarn)")
+
+    return "\n".join(lines)
+
+
+def _check_go_deps(root: Path) -> str | None:
+    gomod = root / "go.mod"
+    if not gomod.exists():
+        return None
+    try:
+        content = safe_read_text(gomod)
+    except Exception:
+        return None
+
+    deps: list[tuple[str, str]] = []
+    in_require = False
+    for line in content.split("\n"):
+        stripped = line.strip()
+        if stripped.startswith("require ("):
+            in_require = True
+            continue
+        if in_require and stripped == ")":
+            in_require = False
+            continue
+        if in_require and stripped:
+            parts = stripped.split()
+            if len(parts) >= 2:
+                deps.append((parts[0], parts[1]))
+
+    if not deps:
+        return None
+
+    lines = ["## Go Dependencies (go.mod)"]
+    lines.append(f"**Total**: {len(deps)}\n")
+    for name, version in sorted(deps, key=lambda x: x[0]):
+        lines.append(f"- **{name}**: `{version}`")
+
+    if (root / "go.sum").exists():
+        lines.append("\n**Lock file**: go.sum present")
+
+    return "\n".join(lines)
+
+
+def _check_rust_deps(root: Path) -> str | None:
+    cargo = root / "Cargo.toml"
+    if not cargo.exists():
+        return None
+    try:
+        content = safe_read_text(cargo)
+    except Exception:
+        return None
+
+    deps: list[tuple[str, str]] = []
+    in_deps = False
+    for line in content.split("\n"):
+        stripped = line.strip()
+        if stripped == "[dependencies]":
+            in_deps = True
+            continue
+        if in_deps and stripped.startswith("["):
+            break
+        if in_deps and "=" in stripped:
+            parts = stripped.split("=", 1)
+            name = parts[0].strip()
+            version = parts[1].strip().strip('"').strip("'")
+            deps.append((name, version))
+
+    if not deps:
+        return None
+
+    lines = ["## Rust Dependencies (Cargo.toml)"]
+    lines.append(f"**Total**: {len(deps)}\n")
+    for name, version in sorted(deps, key=lambda x: x[0]):
+        lines.append(f"- **{name}**: `{version}`")
+
+    if (root / "Cargo.lock").exists():
+        lines.append("\n**Lock file**: Cargo.lock present")
+
+    return "\n".join(lines)
+
+
+def analyze_change_impact(file_path: str, root: Path) -> str:
+    """Analyzes what would be affected if a file changes, using the import graph."""
+    graph = build_import_graph(root, max_files=3000)
+    norm_path = file_path.replace("\\", "/")
+
+    if norm_path not in graph:
+        return f"File `{norm_path}` not found in import graph. Is it a code file in the project?"
+
+    direct_dependents: list[str] = []
+    for source, targets in graph.items():
+        if norm_path in targets and source != norm_path:
+            direct_dependents.append(source)
+
+    transitive: set[str] = set()
+    queue = list(direct_dependents)
+    visited: set[str] = {norm_path}
+    while queue:
+        current = queue.pop(0)
+        if current in visited:
+            continue
+        visited.add(current)
+        transitive.add(current)
+        for source, targets in graph.items():
+            if current in targets and source not in visited:
+                queue.append(source)
+
+    code_files = _iter_code_files(root, max_files=3000)
+    related_tests: list[str] = []
+    file_stem = Path(norm_path).stem
+    for fpath, _ in code_files:
+        fname = fpath.name.lower()
+        if file_stem.lower() in fname and ("test" in fname or "spec" in fname):
+            try:
+                related_tests.append(str(fpath.relative_to(root)).replace("\\", "/"))
+            except ValueError:
+                pass
+
+    for dep in sorted(transitive):
+        dep_stem = Path(dep).stem
+        for fpath, _ in code_files:
+            fname = fpath.name.lower()
+            rel = str(fpath.relative_to(root)).replace("\\", "/")
+            if (
+                dep_stem.lower() in fname
+                and ("test" in fname or "spec" in fname)
+                and rel not in related_tests
+            ):
+                related_tests.append(rel)
+
+    lines = [f"# CHANGE IMPACT ANALYSIS: `{norm_path}`\n"]
+
+    if direct_dependents:
+        lines.append(f"## Direct Dependents ({len(direct_dependents)})")
+        for dep in sorted(direct_dependents):
+            lines.append(f"- `{dep}`")
+    else:
+        lines.append("## Direct Dependents\n- (none -- this file is a leaf)")
+
+    indirect = sorted(transitive - set(direct_dependents))
+    if indirect:
+        lines.append(f"\n## Transitive Impact ({len(indirect)} more)")
+        for dep in indirect:
+            lines.append(f"- `{dep}`")
+
+    if related_tests:
+        lines.append(f"\n## Tests to Run ({len(related_tests)})")
+        for t in sorted(set(related_tests)):
+            lines.append(f"- `{t}`")
+    else:
+        lines.append("\n## Tests to Run\n- (no related test files found)")
+
+    total = len(transitive)
+    if total >= 10:
+        level = "CRITICAL"
+    elif total >= 5:
+        level = "HIGH"
+    elif total >= 2:
+        level = "MEDIUM"
+    elif total >= 1:
+        level = "LOW"
+    else:
+        level = "MINIMAL"
+
+    lines.append("\n## Risk Assessment")
+    lines.append(f"- **Impact level**: {level}")
+    lines.append(f"- **Total affected files**: {total}")
+    lines.append(f"- **Direct dependents**: {len(direct_dependents)}")
+    lines.append(f"- **Transitive dependents**: {len(indirect)}")
+    lines.append(f"- **Related tests**: {len(related_tests)}")
+
+    if total >= 5:
+        lines.append("\n*This file has wide impact. Consider thorough testing and careful review.*")
 
     return "\n".join(lines)
