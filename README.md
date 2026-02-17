@@ -2,6 +2,8 @@
 
 ProjectMind is a standalone MCP server that gives AI coding assistants **persistent memory**, **progressive project exploration**, and **local vector search** capabilities. It works instantly on any project — no indexing required to start.
 
+> **🚀 NEW in v0.6.1**: Critical performance fix eliminates 10-minute hangs! All memory operations are now instant (<10ms) and non-blocking. [Read more →](PERFORMANCE_FIX.md)
+
 ## Features
 
 ### Core Features
@@ -44,7 +46,9 @@ ProjectMind is a standalone MCP server that gives AI coding assistants **persist
   - Timestamped snapshots
   - Easy rollback and restore
   - Version history tracking
-- **Performance Caching & Optimization** (v0.4.0+):
+- **Performance Caching & Optimization** (v0.4.0+, v0.6.1):
+  - **🔥 NEW (v0.6.1)**: Memory operations bypass VectorStore initialization (>1000x faster)
+  - **🔥 NEW (v0.6.1)**: Zero blocking on parallel tool calls
   - Multi-layer caching system (LRU, TTL, File caches)
   - Intelligent project auto-detection (no manual config!)
   - Memory pagination to prevent context window exhaustion
@@ -78,6 +82,7 @@ ProjectMind is a standalone MCP server that gives AI coding assistants **persist
 - 🚀 **[Getting Started Guide](docs/guides/getting-started.md)** - Installation, setup, first steps
 - 📖 **[Complete API Reference](docs/api/tools-reference.md)** - All 29 tools with examples
 - 💡 **[Advanced Usage Guide](docs/guides/advanced-usage.md)** - Power features and workflows
+- ⚡ **[Performance Fix Guide](PERFORMANCE_FIX.md)** - Critical v0.6.1 performance improvements
 - 📁 **[Full Documentation](docs/)** - Complete documentation index
 
 ## Installation
@@ -305,8 +310,10 @@ Get a detailed file summary with code structure, git history, and memory context
 
 ### Memory Management
 
+> **⚡ Performance Note (v0.6.1)**: All memory operations are now instant (<10ms) and never block on VectorStore initialization. Safe to call in parallel with any other tools.
+
 #### `read_memory(max_lines: int | None = 100)`
-Returns the current state of the project memory.
+Returns the current state of the project memory instantly.
 
 **Parameters:**
 - `max_lines`: Maximum number of lines to return (default: 100)

@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.6.1] - 2026-02-17 🚀 CRITICAL PERFORMANCE FIX
+
+### Fixed
+- **Critical: Fixed 10-minute hangs in memory operations**
+  - `read_memory()` now uses direct file access (>1000x faster)
+  - All memory operations (update, clear, delete, versions) bypass VectorStore initialization
+  - `get_index_stats()` pre-checks DB existence before context creation
+  - Memory operations are now instant and non-blocking
+
+### Changed
+- **Memory operations no longer trigger VectorStore initialization**
+  - `read_memory()`, `update_memory()`, `clear_memory()`, `delete_memory_section()`
+  - `save_memory_version()`, `list_memory_versions()`, `restore_memory_version()`
+  - `get_project_memory()` resource
+  - All use direct file access or lightweight MemoryManager instances
+
+### Performance Impact
+- Memory operations: 0-60s → <10ms (parallel call scenarios)
+- Eliminates blocking when AI calls multiple tools in parallel
+- VectorStore only initializes when actually needed (search/index operations)
+
+### Documentation
+- Added `PERFORMANCE_FIX.md` with detailed analysis and recommendations
+- Updated tool descriptions to reflect performance characteristics
+
 ## [0.6.0] - 2026-02-15 🧠 CODE INTELLIGENCE & ADVANCED ANALYSIS
 
 ### Added

@@ -838,8 +838,14 @@ def project_onboarding() -> str:
 
 @mcp.resource("project://memory")
 def get_project_memory() -> str:
-    ctx = get_context()
-    return ctx.memory_manager.read()
+    # Direct file read to avoid blocking on vector store initialization
+    if not config.MEMORY_FILE.exists():
+        return "Memory file not found."
+    try:
+        return config.MEMORY_FILE.read_text()
+    except Exception as e:
+        logger.error(f"Error reading memory: {e}")
+        return f"Error reading memory: {e}"
 
 
 @mcp.tool()
@@ -857,26 +863,50 @@ def read_memory(max_lines: int | None = 100) -> str:
     if max_lines is not None and max_lines <= 0:
         return "Error: max_lines must be positive or None"
 
-    ctx = get_context()
-    return ctx.memory_manager.read(max_lines=max_lines)
+    # Direct file read without context initialization to avoid blocking
+    if not config.MEMORY_FILE.exists():
+        return "Memory file not found."
+
+    try:
+        content = config.MEMORY_FILE.read_text()
+
+        if max_lines is None:
+            return content
+
+        lines = content.split("\n")
+        if len(lines) <= max_lines:
+            return content
+
+        truncated = "\n".join(lines[:max_lines])
+        remaining = len(lines) - max_lines
+        return f"{truncated}\n\n... ({remaining} more lines truncated. Use read_memory(max_lines=None) for full content)"
+    except Exception as e:
+        logger.error(f"Error reading memory: {e}")
+        return f"Error reading memory: {e}"
 
 
 @mcp.tool()
 def update_memory(content: str, section: str = "Recent Decisions") -> str:
-    ctx = get_context()
-    return ctx.memory_manager.update(content, section)
+    # Use direct MemoryManager to avoid vector store initialization
+    from memory_manager import MemoryManager
+    mm = MemoryManager()
+    return mm.update(content, section)
 
 
 @mcp.tool()
 def clear_memory(keep_template: bool = True) -> str:
-    ctx = get_context()
-    return ctx.memory_manager.clear(keep_template)
+    # Use direct MemoryManager to avoid vector store initialization
+    from memory_manager import MemoryManager
+    mm = MemoryManager()
+    return mm.clear(keep_template)
 
 
 @mcp.tool()
 def delete_memory_section(section_name: str) -> str:
-    ctx = get_context()
-    return ctx.memory_manager.delete_section(section_name)
+    # Use direct MemoryManager to avoid vector store initialization
+    from memory_manager import MemoryManager
+    mm = MemoryManager()
+    return mm.delete_section(section_name)
 
 
 @mcp.tool()
@@ -973,6 +1003,16 @@ def ingest_git_history(limit: int = 30) -> str:
 
 @mcp.tool()
 def get_index_stats() -> str:
+    """
+    Returns statistics about the current vector store (number of chunks).
+    This operation is very fast and doesn't trigger vector store initialization.
+    """
+    # Check if vector store exists without creating context
+    vector_db_path = config.VECTOR_STORE_DIR / "chroma.sqlite3"
+    if not vector_db_path.exists():
+        return "Vector store not initialized. Run index_codebase() first."
+    
+    # Only create context if vector DB exists
     ctx = get_context()
     if not ctx.vector_store._initialized:
         return "Vector store not initialized. Run index_codebase() first."
@@ -1554,20 +1594,26 @@ def get_test_coverage_info() -> str:
 
 @mcp.tool()
 def save_memory_version(description: str = "") -> str:
-    ctx = get_context()
-    return ctx.memory_manager.save_version(description)
+    # Use direct MemoryManager to avoid vector store initialization
+    from memory_manager import MemoryManager
+    mm = MemoryManager()
+    return mm.save_version(description)
 
 
 @mcp.tool()
 def list_memory_versions() -> str:
-    ctx = get_context()
-    return ctx.memory_manager.list_versions()
+    # Use direct MemoryManager to avoid vector store initialization
+    from memory_manager import MemoryManager
+    mm = MemoryManager()
+    return mm.list_versions()
 
 
 @mcp.tool()
 def restore_memory_version(timestamp: str) -> str:
-    ctx = get_context()
-    return ctx.memory_manager.restore_version(timestamp)
+    # Use direct MemoryManager to avoid vector store initialization
+    from memory_manager import MemoryManager
+    mm = MemoryManager()
+    return mm.restore_version(timestamp)
 
 
 @mcp.tool()
