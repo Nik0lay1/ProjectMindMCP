@@ -9,6 +9,7 @@ try:
         analyze_project_structure,
         auto_update_memory_from_commits,
         delete_memory_section,
+        ensure_startup,
         extract_tech_stack,
         generate_project_summary,
         get_index_stats,
@@ -33,6 +34,9 @@ except ImportError as e:
 
 def test_memory_tools() -> None:
     print("\n--- Testing Memory Tools ---")
+    
+    # Ensure memory file is initialized
+    ensure_startup()
 
     initial_memory = read_memory()
     print(f"Initial Memory Length: {len(initial_memory)}")
@@ -264,15 +268,15 @@ if __name__ == "__main__":
         test_code_metrics()
         test_memory_versioning()
         test_rag_tools()
-        print("\n✅ All tests passed successfully!")
+        print("\n[PASS] All tests passed successfully!")
     except AssertionError as e:
-        print(f"\n❌ Test failed: {e}")
+        print(f"\n[FAIL] Test failed: {e}")
         import traceback
 
         traceback.print_exc()
         sys.exit(1)
     except Exception as e:
-        print(f"\n❌ An error occurred: {e}")
+        print(f"\n[ERROR] An error occurred: {e}")
         import traceback
 
         traceback.print_exc()
