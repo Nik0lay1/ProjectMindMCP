@@ -1,10 +1,18 @@
 # ProjectMind: Local Context & Memory MCP Server
 
-ProjectMind is a standalone MCP server that gives AI coding assistants **persistent memory**, **progressive project exploration**, and **local vector search** capabilities. It works instantly on any project — no indexing required to start.
+ProjectMind is a standalone MCP server that gives AI coding assistants **persistent memory**, **progressive project exploration**, **graph-enhanced search**, and **local vector search** capabilities. It works instantly on any project — no indexing required to start.
 
-> **🚀 NEW in v0.6.1**: Critical performance fix eliminates 10-minute hangs! All memory operations are now instant (<10ms) and non-blocking. [Read more →](PERFORMANCE_FIX.md)
+> **🔥 NEW in v0.7.0**: Graph-enhanced search with dependency analysis! 7 new tools for intelligent code understanding: dependency traversal, module clustering, specialized searches. [See changelog →](CHANGELOG.md#070---2026-02-17--graph-enhanced-search--intelligence)  
+> **🚀 v0.6.1**: Critical performance fix eliminates 10-minute hangs! [Read more →](PERFORMANCE_FIX.md)
 
 ## Features
+
+### 🔥 Graph-Enhanced Intelligence (NEW in v0.7.0)
+- **Dependency Graph Analysis**: Traverse import relationships up to 5 levels deep
+- **Module Clustering**: Find related files using Jaccard similarity on shared dependencies
+- **Dependency Path Finding**: Discover how modules are connected through imports
+- **Hybrid Search**: Combine semantic search with structural dependencies
+- **Specialized Searches**: Purpose-built tools for debugging, features, and architecture
 
 ### Core Features
 - **Self-Initialization**: Automatically sets up `.ai/` directory and `.gitignore`
@@ -80,8 +88,9 @@ ProjectMind is a standalone MCP server that gives AI coding assistants **persist
 
 **Quick Links:**
 - 🚀 **[Getting Started Guide](docs/guides/getting-started.md)** - Installation, setup, first steps
-- 📖 **[Complete API Reference](docs/api/tools-reference.md)** - All 29 tools with examples
+- 📖 **[Complete API Reference](docs/api/tools-reference.md)** - All 36 tools with examples
 - 💡 **[Advanced Usage Guide](docs/guides/advanced-usage.md)** - Power features and workflows
+- 🔥 **[Changelog v0.7.0](CHANGELOG.md)** - Graph-enhanced search & 7 new tools
 - ⚡ **[Performance Fix Guide](PERFORMANCE_FIX.md)** - Critical v0.6.1 performance improvements
 - 📁 **[Full Documentation](docs/)** - Complete documentation index
 
@@ -342,6 +351,54 @@ Clears the memory file. If `keep_template=True`, preserves the basic structure.
 #### `delete_memory_section(section_name: str)`
 Deletes a specific section from the memory file.
 
+### Graph-Enhanced Search (NEW in v0.7.0)
+
+#### `search_with_dependencies(query, n_results=5, include_deps=True, depth=1)`
+Hybrid search combining semantic similarity with dependency graph.
+- Finds semantically similar code
+- Optionally includes dependencies of matching files
+- Provides complete context for understanding
+- Depth control for dependency inclusion (1-3 levels)
+
+#### `get_dependencies_with_depth(file_path, depth=2, direction="downstream")`
+Traverse dependency graph from a file.
+- `direction`: "downstream" (imports) or "upstream" (importers)
+- `depth`: How many levels deep (1-5)
+- Shows distance from origin file
+- Useful for impact analysis and refactoring
+
+#### `find_dependency_path(from_file, to_file, max_depth=10)`
+Find shortest import chain between two files.
+- Discover how modules are connected
+- Useful for understanding architecture
+- Shows step-by-step dependency path
+
+#### `get_module_cluster(file_path, similarity_threshold=0.3, max_cluster_size=20)`
+Find files related to target based on shared dependencies.
+- Uses Jaccard similarity
+- Identifies modules that work together
+- Configurable similarity threshold (0.0-1.0)
+
+### Specialized Search Tools (NEW in v0.7.0)
+
+#### `search_for_errors(error_text, stacktrace="", n_results=5)`
+Debug-focused search for error messages.
+- Searches error handlers, tests, similar patterns
+- Includes recent git commits mentioning error
+- Organized output for debugging
+
+#### `search_for_feature(feature_name, n_results=10)`
+Understand feature implementation.
+- Finds implementations, configs, tests
+- Identifies entry points
+- Shows feature structure
+
+#### `search_architecture(component, n_results=10)`
+Architectural analysis of components.
+- Finds core modules and dependencies
+- Shows module clustering
+- Helps understand system design
+
 ### Codebase Indexing & Search
 
 #### `index_codebase(force: bool = False)`
@@ -351,9 +408,11 @@ Indexes the codebase for vector search.
 - Automatically filters binary files and large files
 
 #### `search_codebase(query: str, n_results: int = 5)`
-Searches the codebase using vector similarity.
+Searches the codebase using vector similarity with enhanced metadata.
 - `query`: Search query (required, non-empty)
 - `n_results`: Number of results (1-50, default 5)
+- **NEW**: Includes confidence scores, coverage indicators, relevance scores
+- **NEW**: Smart suggestions based on result quality
 
 #### `get_index_stats()`
 Returns statistics about the current vector store (number of chunks).

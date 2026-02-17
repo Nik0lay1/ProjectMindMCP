@@ -1,5 +1,65 @@
 # Changelog
 
+## [0.7.0] - 2026-02-17 🧠 GRAPH-ENHANCED SEARCH & INTELLIGENCE
+
+### Added - Graph-Based Tools (4 new tools)
+- **`get_dependencies_with_depth(file_path, depth, direction)`** - Traverse dependency graph up to 5 levels deep
+  - Supports both downstream (what it imports) and upstream (what imports it)
+  - Groups results by distance from origin file
+  - BFS traversal for accurate depth tracking
+
+- **`find_dependency_path(from_file, to_file, max_depth)`** - Find shortest dependency chain between files
+  - Useful for understanding how modules are connected
+  - Shows step-by-step import path
+  - Configurable search depth (1-20 levels)
+
+- **`get_module_cluster(file_path, similarity_threshold, max_cluster_size)`** - Find related modules
+  - Uses Jaccard similarity on shared dependencies
+  - Identifies files that work together
+  - Configurable similarity threshold (0.0-1.0)
+
+- **`search_with_dependencies(query, n_results, include_deps, depth)`** - Hybrid search
+  - Combines semantic search with dependency graph
+  - Automatically includes related files
+  - Provides complete context for code understanding
+
+### Added - Specialized Search Tools (3 new tools)
+- **`search_for_errors(error_text, stacktrace, n_results)`** - Debug-focused search
+  - Searches error handlers, tests, similar patterns
+  - Includes recent git commits mentioning the error
+  - Organized output for efficient debugging
+
+- **`search_for_feature(feature_name, n_results)`** - Feature understanding
+  - Finds implementations, configs, tests, docs
+  - Identifies entry points automatically
+  - Shows feature structure and organization
+
+- **`search_architecture(component, n_results)`** - Architectural analysis
+  - Finds core modules and dependencies
+  - Shows module clustering and relationships
+  - Helps understand system design
+
+### Enhanced - Search Results Metadata
+- **`search_codebase()`** now includes:
+  - Confidence scores (0-100%)
+  - Coverage indicators (full/partial)
+  - Per-result relevance scores
+  - Smart suggestions based on results quality
+  - File count and result statistics
+
+### Technical Improvements
+- **Graph Intelligence**: 3 new graph utility functions in `code_intelligence.py`
+  - `get_dependencies_with_depth()` - BFS traversal with configurable depth
+  - `find_dependency_path()` - Shortest path algorithm
+  - `get_module_cluster()` - Jaccard similarity clustering
+- **Performance**: All graph operations use cached import graph
+- **Accuracy**: Dependency resolution improved for Python, JS/TS files
+- **Code Quality**: Type hints, validation, error handling for all new tools
+
+### Total Tools
+- **v0.6.0**: 29 tools
+- **v0.7.0**: 36 tools (+7 new)
+
 ## [0.6.1] - 2026-02-17 🚀 CRITICAL PERFORMANCE FIX
 
 ### Fixed
