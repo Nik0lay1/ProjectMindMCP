@@ -1,10 +1,6 @@
-feat: Add centralized logging system with file rotation
+docs: release v0.6.0 - code intelligence and advanced analysis
 
-- Created logger.py with RotatingFileHandler
-- Logs stored in .ai/projectmind.log
-- 10MB max size per log file, 5 backup files
-- Both file and stderr output
-- Structured logging with timestamps and context
-- Added comprehensive logging tests
-- Replaced simple stderr logging with proper logger
-- Better error tracking and debugging capabilities
+- Bump version to 0.6.0 in pyproject.toml
+- Add CHANGELOG entry for v0.6.0 with all new features
+- Update README with 7 new code intelligence tools
+- Update tool count from 25 to 29 in documentation

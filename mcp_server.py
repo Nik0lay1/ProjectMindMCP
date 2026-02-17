@@ -768,7 +768,8 @@ def get_dependencies_with_depth(
         return f"File not found: {file_path}"
 
     try:
-        from code_intelligence import build_import_graph, get_dependencies_with_depth as _get_deps
+        from code_intelligence import build_import_graph
+        from code_intelligence import get_dependencies_with_depth as _get_deps
 
         rel_path = str(target.relative_to(config.PROJECT_ROOT)).replace("\\", "/")
         graph = build_import_graph(config.PROJECT_ROOT)
@@ -836,7 +837,8 @@ def find_dependency_path(from_file: str, to_file: str, max_depth: int = 10) -> s
         return f"Target file not found: {to_file}"
 
     try:
-        from code_intelligence import build_import_graph, find_dependency_path as _find_path
+        from code_intelligence import build_import_graph
+        from code_intelligence import find_dependency_path as _find_path
 
         source_rel = str(source.relative_to(config.PROJECT_ROOT)).replace("\\", "/")
         target_rel = str(target.relative_to(config.PROJECT_ROOT)).replace("\\", "/")
@@ -850,7 +852,7 @@ def find_dependency_path(from_file: str, to_file: str, max_depth: int = 10) -> s
         if len(path) == 1:
             return f"`{from_file}` and `{to_file}` are the same file"
 
-        lines = [f"# DEPENDENCY PATH\n"]
+        lines = ["# DEPENDENCY PATH\n"]
         lines.append(f"From: `{from_file}`")
         lines.append(f"To: `{to_file}`")
         lines.append(f"Distance: {len(path) - 1} steps\n")
@@ -909,7 +911,7 @@ def get_module_cluster(
         if not cluster:
             return f"No related modules found with similarity >= {similarity_threshold}"
 
-        lines = [f"# MODULE CLUSTER\n"]
+        lines = ["# MODULE CLUSTER\n"]
         lines.append(f"Target: `{file_path}`")
         lines.append(f"Similarity threshold: {similarity_threshold}")
         lines.append(f"Found: {len(cluster)} related files\n")
@@ -985,7 +987,8 @@ def search_with_dependencies(
 
         # Optionally add dependencies
         if include_deps and matching_files:
-            from code_intelligence import build_import_graph, get_dependencies_with_depth as _get_deps
+            from code_intelligence import build_import_graph
+            from code_intelligence import get_dependencies_with_depth as _get_deps
 
             graph = build_import_graph(config.PROJECT_ROOT)
             all_deps: set[str] = set()
@@ -1064,13 +1067,13 @@ def search_for_errors(
         test_query = f"test {error_text}"
         test_results = ctx.vector_store.query(query_texts=[test_query], n_results=n_results)
 
-        lines = [f"# ERROR DEBUGGING SEARCH\n"]
+        lines = ["# ERROR DEBUGGING SEARCH\n"]
         lines.append(f"Error: {error_text}\n")
 
         # Code matches
         if code_results and code_results.get("documents") and code_results["documents"][0]:
             metadatas = code_results.get("metadatas", [[]])[0]
-            files = set(meta.get("file_path", "") for meta in metadatas if meta.get("file_path"))
+            files = {meta.get("file_path", "") for meta in metadatas if meta.get("file_path")}
 
             lines.append("## Related Code")
             for file in sorted(files):
@@ -1080,7 +1083,7 @@ def search_for_errors(
         # Exception handling matches
         if exception_results and exception_results.get("documents") and exception_results["documents"][0]:
             metadatas = exception_results.get("metadatas", [[]])[0]
-            files = set(meta.get("file_path", "") for meta in metadatas if meta.get("file_path"))
+            files = {meta.get("file_path", "") for meta in metadatas if meta.get("file_path")}
 
             lines.append("## Error Handlers")
             for file in sorted(files):
@@ -1090,7 +1093,7 @@ def search_for_errors(
         # Test matches
         if test_results and test_results.get("documents") and test_results["documents"][0]:
             metadatas = test_results.get("metadatas", [[]])[0]
-            files = set(meta.get("file_path", "") for meta in metadatas if meta.get("file_path"))
+            files = {meta.get("file_path", "") for meta in metadatas if meta.get("file_path")}
             test_files = {f for f in files if "test" in f.lower() or "spec" in f.lower()}
 
             if test_files:
@@ -1102,7 +1105,6 @@ def search_for_errors(
         # Git history if available
         if ctx.git_repo:
             try:
-                from git_utils import CommitInfo
                 commits = ctx.git_repo.get_commits(max_count=50, since_days=30)
                 error_commits = [c for c in commits if error_text.lower() in c.message.lower()]
 
@@ -1210,23 +1212,20 @@ def search_for_feature(
                 lines.append("")
 
         # Add dependency analysis if we found implementation files
-        from code_intelligence import build_import_graph, get_dependencies_with_depth as _get_deps
+        from code_intelligence import build_import_graph
+        from code_intelligence import get_dependencies_with_depth as _get_deps
 
         if main_results and main_results.get("metadatas"):
             impl_files = [m.get("file_path") for m in main_results["metadatas"][0] if m.get("file_path")][:3]
             graph = build_import_graph(config.PROJECT_ROOT)
 
-            entry_points = []
+            # Find files with no upstream dependencies (potential entry points)
             for file in impl_files:
                 if file in graph:
                     upstream = _get_deps(file, graph, depth=1, direction="upstream")
                     if not upstream:  # No one imports this = potential entry point
-                        entry_points.append(file)
-
-            if entry_points:
-                lines.append("## Potential Entry Points")
-                for file in entry_points:
-                    lines.append(f"- `{file}`")
+                        lines.append(f"## Potential Entry Point: `{file}`")
+                        break
 
         return "\n".join(lines)
 
@@ -1259,7 +1258,8 @@ def search_architecture(
         return "Error: component cannot be empty"
 
     try:
-        from code_intelligence import build_import_graph, get_module_cluster as _get_cluster
+        from code_intelligence import build_import_graph
+        from code_intelligence import get_module_cluster as _get_cluster
 
         ctx = get_context()
         coll = ctx.vector_store.get_collection()
@@ -1287,8 +1287,7 @@ def search_architecture(
             # Build dependency graph
             graph = build_import_graph(config.PROJECT_ROOT)
 
-            # Find entry points (files with no upstream dependencies in this set)
-            entry_points = []
+            # Find related modules using clustering
             for file in main_files[:5]:
                 if file in graph:
                     cluster = _get_cluster(file, config.PROJECT_ROOT, similarity_threshold=0.4, max_cluster_size=10)
@@ -1539,7 +1538,6 @@ def search_codebase(query: str, n_results: int = 5) -> str:
         for i in range(len(results["documents"][0])):
             doc = results["documents"][0][i]
             meta = results["metadatas"][0][i]
-            source = meta.get("source", "unknown")
             file_path = meta.get("file_path", "")
 
             relevance_score = 0
