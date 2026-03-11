@@ -2,13 +2,10 @@ import os
 from collections.abc import Callable
 from pathlib import Path
 
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-
+from ast_splitter import ASTSplitter
 from config import (
     BATCH_SIZE,
     BINARY_EXTENSIONS,
-    CHUNK_OVERLAP,
-    CHUNK_SIZE,
     INDEXABLE_EXTENSIONS,
     get_max_file_size_bytes,
     get_max_memory_bytes,
@@ -39,9 +36,7 @@ class CodebaseIndexer:
             vector_store: VectorStoreManager instance for storing chunks
         """
         self.vector_store = vector_store
-        self.text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP
-        )
+        self.splitter = ASTSplitter()
 
     def _create_batch_upsert_callback(self) -> BatchUpsertCallback:
         """
@@ -134,7 +129,7 @@ class CodebaseIndexer:
 
     def process_file_to_chunks(self, file_path: Path, indexer: MemoryLimitedIndexer) -> bool:
         """
-        Processes a single file: reads, splits into chunks, adds to indexer.
+        Processes a single file: reads, splits into AST-aware chunks, adds to indexer.
 
         Args:
             file_path: File to process
@@ -148,12 +143,14 @@ class CodebaseIndexer:
             if not content.strip():
                 return False
 
-            chunks = self.text_splitter.split_text(content)
+            chunks = self.splitter.split(content, file_path)
 
-            for i, chunk in enumerate(chunks):
-                indexer.add_chunk(
-                    chunk, {"source": str(file_path), "chunk_index": i}, f"{file_path}_{i}"
-                )
+            for chunk in chunks:
+                text = chunk["text"]
+                meta = chunk["metadata"]
+                class_prefix = f"{meta['class_name']}_" if meta.get("class_name") else ""
+                chunk_id = f"{file_path}_{meta['symbol_type']}_{class_prefix}{meta['symbol_name']}_{meta['chunk_index']}"
+                indexer.add_chunk(text, meta, chunk_id)
 
             return True
         except (OSError, UnicodeDecodeError) as e:

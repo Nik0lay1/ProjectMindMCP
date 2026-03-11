@@ -16,6 +16,14 @@ dependencies = [
     "radon>=6.0.0",
     "pylint>=3.0.0",
     "numpy>=2.0.0",
+    "tree-sitter>=0.25.0",
+    "tree-sitter-python>=0.25.0",
+    "tree-sitter-javascript>=0.25.0",
+    "tree-sitter-typescript>=0.23.0",
+    "tree-sitter-java>=0.23.0",
+    "tree-sitter-go>=0.25.0",
+    "tree-sitter-rust>=0.24.0",
+    "tree-sitter-ruby>=0.23.0",
 ]
 
 [project.optional-dependencies]
@@ -35,6 +43,7 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools]
 py-modules = [
     "mcp_server",
+    "ast_splitter",
     "config",
     "logger",
     "cache_manager",
