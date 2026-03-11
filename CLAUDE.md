@@ -35,7 +35,9 @@ Memory__update_memory  ←  section: "Recent Decisions", content: "..."
 |---|---|
 | `mcp_server.py` | All MCP tool definitions (~2300 lines) |
 | `vector_store_manager.py` | ChromaDB wrapper + query cache |
-| `codebase_indexer.py` | File scanning + chunking logic |
+| `codebase_indexer.py` | File scanning + AST-aware chunking |
+| `ast_splitter.py` | tree-sitter parser (Python, JS, TS, TSX, Java, Go, Rust, Ruby) |
+| `run_index.py` | Helper script for manual full re-indexing |
 | `config.py` | All configuration (model, paths, extensions) |
 | `context.py` | Dependency injection (AppContext singleton) |
 | `memory_manager.py` | Read/write/version `.ai/memory.md` |
@@ -44,8 +46,10 @@ Memory__update_memory  ←  section: "Recent Decisions", content: "..."
 
 ## Key Configuration (config.py)
 
-- **Embedding model**: `flax-sentence-embeddings/st-codesearch-distilroberta-base`
+- **Embedding model**: `flax-sentence-embeddings/st-codesearch-distilroberta-base` (code-trained, ~130MB)
 - **Chunk size**: 1500 chars / 150 overlap
+- **Chunking strategy**: AST-aware (tree-sitter) → falls back to text splitter for unsupported types
+- **Chunk metadata**: `symbol_type`, `symbol_name`, `class_name`, `line_start`, `line_end`
 - **Vector store**: ChromaDB persistent at `.ai/vector_store/`
 - **Memory file**: `.ai/memory.md`
 
