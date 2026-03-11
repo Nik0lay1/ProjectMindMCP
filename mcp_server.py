@@ -1,6 +1,7 @@
 import os
 import sys
 import threading
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from pathlib import Path
 from time import time
 
@@ -1485,8 +1486,29 @@ def delete_memory_section(section_name: str) -> str:
     return mm.delete_section(section_name)
 
 
+# Thread pool for long-running operations (indexing)
+_indexing_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="indexer")
+
+# Default timeout for indexing operations (in seconds)
+DEFAULT_INDEX_TIMEOUT = 300  # 5 minutes
+MAX_INDEX_FILES = 5000  # Maximum files to index per operation
+
+
 @mcp.tool()
-def index_codebase(force: bool = False) -> str:
+def index_codebase(force: bool = False, timeout: int = DEFAULT_INDEX_TIMEOUT) -> str:
+    """
+    Indexes the entire codebase for semantic search.
+    
+    This is a long-running operation. Use timeout parameter to control max execution time.
+    For large codebases, consider using index_changed_files() instead.
+
+    Args:
+        force: If True, clears existing index before indexing
+        timeout: Maximum time in seconds (default 300s/5min)
+
+    Returns:
+        Status message with indexing stats or timeout warning
+    """
     ctx = get_context()
     if ctx.vector_store.get_collection() is None:
         return "Failed to initialize vector store."
@@ -1495,7 +1517,27 @@ def index_codebase(force: bool = False) -> str:
     ignored_dirs = get_ignored_dirs()
     ignore_patterns = load_index_ignore_patterns()
 
-    return ctx.indexer.index_all(root_dir, ignored_dirs, ignore_patterns, force)
+    # Submit indexing work to thread pool with timeout
+    future = _indexing_executor.submit(
+        ctx.indexer.index_all, 
+        root_dir, 
+        ignored_dirs, 
+        ignore_patterns, 
+        force
+    )
+    
+    try:
+        result = future.result(timeout=timeout)
+        return result
+    except FutureTimeoutError:
+        # Get partial stats if available
+        stats = ""
+        try:
+            # Try to get partial progress
+            stats = " (partial results may be saved)"
+        except Exception:
+            pass
+        return f"Indexing timed out after {timeout}s.{stats} Consider: 1) Increasing timeout, 2) Using index_changed_files() for incremental updates, 3) Reducing codebase size."
 
 
 @mcp.tool()
@@ -1881,7 +1923,19 @@ def get_recent_changes_summary(days: int = 7) -> str:
 
 
 @mcp.tool()
-def index_changed_files() -> str:
+def index_changed_files(timeout: int = 120) -> str:
+    """
+    Incrementally indexes only changed files since last indexing.
+    
+    This is faster than index_codebase but requires previous indexing to work.
+    Has a shorter default timeout as it typically processes fewer files.
+
+    Args:
+        timeout: Maximum time in seconds (default 120s/2min)
+
+    Returns:
+        Status message with indexing stats or timeout warning
+    """
     ctx = get_context()
     if ctx.vector_store.get_collection() is None:
         return "Failed to initialize vector store."
@@ -1890,7 +1944,19 @@ def index_changed_files() -> str:
     ignored_dirs = get_ignored_dirs()
     ignore_patterns = load_index_ignore_patterns()
 
-    return ctx.indexer.index_changed(root_dir, ignored_dirs, ignore_patterns)
+    # Submit indexing work to thread pool with timeout
+    future = _indexing_executor.submit(
+        ctx.indexer.index_changed, 
+        root_dir, 
+        ignored_dirs, 
+        ignore_patterns
+    )
+    
+    try:
+        result = future.result(timeout=timeout)
+        return result
+    except FutureTimeoutError:
+        return f"Incremental indexing timed out after {timeout}s. Try again or use index_codebase() for full reindex."
 
 
 def should_include_search_result(

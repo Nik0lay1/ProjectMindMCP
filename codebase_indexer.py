@@ -19,6 +19,13 @@ from vector_store_manager import VectorStoreManager
 
 logger = get_logger()
 
+# Maximum files to index in a single index_all operation
+# This prevents extremely long operations that can cause timeouts
+MAX_FILES_PER_INDEX = 5000
+
+# Progress reporting interval (every N files)
+PROGRESS_REPORT_INTERVAL = 100
+
 BatchUpsertCallback = Callable[[list[str], list[dict], list[str]], None]
 
 
@@ -212,11 +219,21 @@ class CodebaseIndexer:
         logger.info(f"Scanning files (memory limit: {max_memory / 1024 / 1024:.0f} MB)...")
 
         indexable_files = self.scan_indexable_files(root_dir, ignored_dirs, ignore_patterns)
+        
+        # Apply limit to prevent extremely long operations
+        total_files = len(indexable_files)
+        if total_files > MAX_FILES_PER_INDEX:
+            logger.warning(f"Limiting index to {MAX_FILES_PER_INDEX} of {total_files} files")
+            indexable_files = indexable_files[:MAX_FILES_PER_INDEX]
+        
         file_count = 0
 
         for file_path in indexable_files:
             if self.process_file_to_chunks(file_path, indexer):
                 file_count += 1
+            # Progress reporting
+            if file_count % PROGRESS_REPORT_INTERVAL == 0:
+                logger.info(f"Progress: {file_count}/{len(indexable_files)} files processed...")
 
         indexer.flush()
 
@@ -224,7 +241,8 @@ class CodebaseIndexer:
         self.vector_store.rebuild_bm25()
 
         stats = indexer.get_stats()
-        return f"Indexed {file_count} files ({stats['total_chunks']} chunks in {stats['total_batches']} batches)."
+        warning = "" if total_files <= MAX_FILES_PER_INDEX else f" (limited from {total_files} files)"
+        return f"Indexed {file_count} files ({stats['total_chunks']} chunks in {stats['total_batches']} batches){warning}."
 
     def index_changed(
         self, root_dir: Path, ignored_dirs: set[str], ignore_patterns: set[str]
@@ -259,6 +277,9 @@ class CodebaseIndexer:
         for file_path in changed_files:
             if self.process_file_with_metadata(file_path, indexer, metadata):
                 file_count += 1
+            # Progress reporting
+            if file_count % PROGRESS_REPORT_INTERVAL == 0:
+                logger.info(f"Progress: {file_count}/{len(changed_files)} files processed...")
 
         indexer.flush()
 
