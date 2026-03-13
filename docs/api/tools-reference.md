@@ -61,6 +61,8 @@ delete_memory_section("Old Notes")
 
 ## Codebase Indexing & Search
 
+> **Prerequisites:** All search tools (`search_codebase`, `search_codebase_advanced`, `search_with_dependencies`, `search_for_errors`, `search_for_feature`, `search_architecture`) require the index to be built first. If you call them without indexing, they return a clear error with instructions. **Always run `index_codebase()` before any search tool.**
+
 ### `index_codebase(force: bool = False)`
 Indexes the entire codebase for vector search.
 
@@ -102,7 +104,7 @@ index_changed_files()   # Daily workflow
 ---
 
 ### `search_codebase(query: str, n_results: int = 5)`
-Searches indexed codebase using vector similarity.
+⚠️ **Requires index.** Searches indexed codebase using vector similarity.
 
 **Parameters:**
 - `query` (str, required): Search query (cannot be empty)
@@ -118,7 +120,7 @@ search_codebase("authentication logic", n_results=10)
 ---
 
 ### `search_codebase_advanced(query: str, n_results: int = 5, file_types: List[str] = None, exclude_dirs: List[str] = None, min_relevance: float = 0.0)`
-🆕 Advanced search with filtering capabilities.
+⚠️ **Requires index.** 🆕 Advanced search with filtering capabilities.
 
 **Parameters:**
 - `query` (str, required): Search query

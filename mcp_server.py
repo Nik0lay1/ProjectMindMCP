@@ -114,6 +114,33 @@ def ensure_startup() -> None:
 mcp = FastMCP("ProjectMind")
 
 
+def _check_index_ready() -> str | None:
+    """Returns an error message string if the index is not ready, or None if OK."""
+    import sqlite3
+
+    vector_db_path = config.VECTOR_STORE_DIR / "chroma.sqlite3"
+    if not vector_db_path.exists():
+        return (
+            "⚠️ INDEX NOT BUILT. You must run `index_codebase()` first before using search tools.\n"
+            "Steps:\n1. Call `index_codebase()` to build the index\n2. Then retry this tool."
+        )
+    try:
+        conn = sqlite3.connect(str(vector_db_path))
+        count = conn.execute("SELECT COUNT(*) FROM embeddings").fetchone()[0]
+        conn.close()
+        if count == 0:
+            return (
+                "⚠️ INDEX IS EMPTY. The vector store exists but has no data.\n"
+                "Steps:\n1. Call `index_codebase(force=True)` to rebuild the index\n2. Then retry this tool."
+            )
+    except Exception:
+        return (
+            "⚠️ INDEX IS UNREADABLE. The vector store may be corrupted.\n"
+            "Steps:\n1. Call `index_codebase(force=True)` to rebuild the index\n2. Then retry this tool."
+        )
+    return None
+
+
 @mcp.tool()
 def set_project_root(path: str) -> str:
     """
@@ -957,6 +984,10 @@ def search_with_dependencies(
     if depth < 1 or depth > 3:
         return "Error: depth must be between 1 and 3"
 
+    err = _check_index_ready()
+    if err:
+        return err
+
     try:
         # First do semantic search
         ctx = get_context()
@@ -1038,6 +1069,10 @@ def search_for_errors(error_text: str, stacktrace: str = "", n_results: int = 5)
 
     if not error_text.strip():
         return "Error: error_text cannot be empty"
+
+    err = _check_index_ready()
+    if err:
+        return err
 
     try:
         ctx = get_context()
@@ -1143,6 +1178,10 @@ def search_for_feature(feature_name: str, n_results: int = 10) -> str:
 
     if not feature_name.strip():
         return "Error: feature_name cannot be empty"
+
+    err = _check_index_ready()
+    if err:
+        return err
 
     try:
         ctx = get_context()
@@ -1258,6 +1297,10 @@ def search_architecture(component: str, n_results: int = 10) -> str:
 
     if not component.strip():
         return "Error: component cannot be empty"
+
+    err = _check_index_ready()
+    if err:
+        return err
 
     try:
         from code_intelligence import build_import_graph
@@ -1519,6 +1562,10 @@ def search_codebase(query: str, n_results: int = 5) -> str:
 
     if n_results > 50:
         return "Error: n_results cannot exceed 50."
+
+    err = _check_index_ready()
+    if err:
+        return err
 
     try:
         ctx = get_context()
@@ -1983,6 +2030,10 @@ def search_codebase_advanced(
 
     if min_relevance < 0 or min_relevance > 1:
         return "Error: min_relevance must be between 0 and 1."
+
+    err = _check_index_ready()
+    if err:
+        return err
 
     try:
         ctx = get_context()

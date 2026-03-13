@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.7.1] - 2026-03-13 🛡️ INDEX PREREQUISITE GUARD
+
+### Added
+- **`_check_index_ready()`** internal guard function — validates that the vector store index is built and non-empty before any search tool runs
+  - Checks for DB file existence via SQLite (no vector store initialization cost)
+  - Distinguishes between: index not built, index empty, index corrupted
+  - Returns actionable step-by-step instructions for the AI to follow
+
+### Changed
+- **Search tools now fail fast with clear instructions** if `index_codebase()` was not called first:
+  - `search_codebase`
+  - `search_codebase_advanced`
+  - `search_with_dependencies`
+  - `search_for_errors`
+  - `search_for_feature`
+  - `search_architecture`
+
+---
+
 ## [0.7.0] - 2026-02-17 🧠 GRAPH-ENHANCED SEARCH & INTELLIGENCE
 
 ### Added - Graph-Based Tools (4 new tools)
