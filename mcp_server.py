@@ -1329,14 +1329,13 @@ def search_architecture(component: str, n_results: int = 10) -> str:
                 lines.append(f"- `{file}`")
             lines.append("")
 
-            # Build dependency graph
             graph = build_import_graph(config.PROJECT_ROOT)
 
-            # Find related modules using clustering
             for file in main_files[:5]:
                 if file in graph:
                     cluster = _get_cluster(
-                        file, config.PROJECT_ROOT, similarity_threshold=0.4, max_cluster_size=10
+                        file, config.PROJECT_ROOT, similarity_threshold=0.4, max_cluster_size=10,
+                        graph=graph,
                     )
                     if cluster:
                         lines.append(f"## Related to `{file}`")
@@ -1553,6 +1552,8 @@ def index_codebase(force: bool = False) -> str:
     Returns:
         Status message with indexing stats
     """
+    from code_intelligence import invalidate_import_graph_cache
+
     ctx = get_context()
     if ctx.vector_store.get_collection() is None:
         return "Failed to initialize vector store."
@@ -1561,7 +1562,9 @@ def index_codebase(force: bool = False) -> str:
     ignored_dirs = get_ignored_dirs()
     ignore_patterns = load_index_ignore_patterns()
 
-    return ctx.indexer.index_all(root_dir, ignored_dirs, ignore_patterns, force)
+    result = ctx.indexer.index_all(root_dir, ignored_dirs, ignore_patterns, force)
+    invalidate_import_graph_cache()
+    return result
 
 
 @mcp.tool()
@@ -1960,6 +1963,8 @@ def index_changed_files() -> str:
     Returns:
         Status message with indexing stats
     """
+    from code_intelligence import invalidate_import_graph_cache
+
     ctx = get_context()
     if ctx.vector_store.get_collection() is None:
         return "Failed to initialize vector store."
@@ -1968,7 +1973,9 @@ def index_changed_files() -> str:
     ignored_dirs = get_ignored_dirs()
     ignore_patterns = load_index_ignore_patterns()
 
-    return ctx.indexer.index_changed(root_dir, ignored_dirs, ignore_patterns)
+    result = ctx.indexer.index_changed(root_dir, ignored_dirs, ignore_patterns)
+    invalidate_import_graph_cache()
+    return result
 
 
 def should_include_search_result(

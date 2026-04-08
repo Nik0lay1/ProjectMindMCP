@@ -45,6 +45,7 @@ Unlike naive text splitters that cut code in the middle of a function, ProjectMi
 - Find related files via shared dependency clustering
 - Discover the shortest path between any two modules
 - Identify entry points and orphaned modules
+- **Cached import graph** (120s TTL) — repeated calls return instantly instead of re-scanning the filesystem
 
 ### ⚡ Instant Project Exploration (no indexing needed)
 - `get_project_overview()` — tech stack, git info, file stats in < 1 second
@@ -207,7 +208,7 @@ vector_store_manager.py ← ChromaDB wrapper + hybrid search
 bm25_index.py           ← BM25 keyword index + RRF fusion
 codebase_indexer.py     ← file scanning & AST-aware chunking
 ast_splitter.py         ← tree-sitter parser (9 languages)
-code_intelligence.py    ← import graph, complexity analysis
+code_intelligence.py    ← import graph, complexity analysis, cached graph
 memory_manager.py       ← persistent memory read/write
 incremental_indexing.py ← change tracking
 context.py              ← dependency injection
@@ -234,4 +235,4 @@ MIT
 
 ---
 
-*Built with AI assistance — [Zencoder](https://zencoder.ai) was used throughout development for coding, debugging, refactoring, and documentation.*
+*Built with AI assistance — was used throughout development for coding, debugging, refactoring, and documentation.*

@@ -3,6 +3,8 @@
 import json
 import os
 import re
+import threading
+import time
 from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -445,8 +447,46 @@ def _resolve_import_to_file(imp: str, source_file: Path, root: Path, ext: str) -
     return None
 
 
+_import_graph_cache: dict[str, list[str]] | None = None
+_import_graph_root: Path | None = None
+_import_graph_time: float = 0.0
+_import_graph_lock = threading.Lock()
+_GRAPH_CACHE_TTL = 120
+
+
 def build_import_graph(root: Path, max_files: int = 3000) -> dict[str, list[str]]:
-    """Builds a mapping: file_path -> [list of files it imports from]."""
+    """Builds a mapping: file_path -> [list of files it imports from]. Cached for 120s."""
+    global _import_graph_cache, _import_graph_root, _import_graph_time
+
+    now = time.monotonic()
+    with _import_graph_lock:
+        if (
+            _import_graph_cache is not None
+            and _import_graph_root == root
+            and (now - _import_graph_time) < _GRAPH_CACHE_TTL
+        ):
+            return _import_graph_cache
+
+    graph = _build_import_graph_uncached(root, max_files)
+
+    with _import_graph_lock:
+        _import_graph_cache = graph
+        _import_graph_root = root
+        _import_graph_time = time.monotonic()
+
+    return graph
+
+
+def invalidate_import_graph_cache() -> None:
+    """Invalidates the cached import graph. Call after indexing or major file changes."""
+    global _import_graph_cache, _import_graph_time
+    with _import_graph_lock:
+        _import_graph_cache = None
+        _import_graph_time = 0.0
+
+
+def _build_import_graph_uncached(root: Path, max_files: int = 3000) -> dict[str, list[str]]:
+    """Builds import graph without caching."""
     code_files = _iter_code_files(root, max_files=max_files)
     graph: dict[str, list[str]] = {}
 
@@ -570,7 +610,11 @@ def find_dependency_path(
 
 
 def get_module_cluster(
-    file_path: str, root: Path, similarity_threshold: float = 0.3, max_cluster_size: int = 20
+    file_path: str,
+    root: Path,
+    similarity_threshold: float = 0.3,
+    max_cluster_size: int = 20,
+    graph: dict[str, list[str]] | None = None,
 ) -> dict[str, float]:
     """
     Finds files that are closely related to the given file based on shared dependencies.
@@ -580,11 +624,13 @@ def get_module_cluster(
         root: Project root
         similarity_threshold: Minimum Jaccard similarity (0.0-1.0)
         max_cluster_size: Maximum number of related files to return
+        graph: Pre-built import graph (optional, built if not provided)
 
     Returns:
         Dict mapping file_path -> similarity_score, sorted by score descending
     """
-    graph = build_import_graph(root, max_files=3000)
+    if graph is None:
+        graph = build_import_graph(root, max_files=3000)
 
     norm_path = file_path.replace("\\", "/")
     if norm_path not in graph:
@@ -625,24 +671,20 @@ def get_module_cluster(
     return dict(sorted_similar[:max_cluster_size])
 
 
-def _find_related_tests(
-    file_path: str, root: Path, code_files: list[tuple[Path, str]]
+def _find_related_tests_from_graph(
+    file_path: str, graph: dict[str, list[str]]
 ) -> list[str]:
-    name = Path(file_path).stem
+    name = Path(file_path).stem.lower()
     related = []
-    for fpath, _ in code_files:
-        fname = fpath.name.lower()
-        if name.lower() in fname and ("test" in fname or "spec" in fname):
-            try:
-                related.append(str(fpath.relative_to(root)).replace("\\", "/"))
-            except ValueError:
-                pass
+    for rel_path in graph:
+        fname = Path(rel_path).name.lower()
+        if name in fname and ("test" in fname or "spec" in fname):
+            related.append(rel_path)
     return related
 
 
 def get_file_relations(file_path: str, root: Path) -> str:
     """Returns import relations for a file: imports from, imported by, related tests."""
-    code_files = _iter_code_files(root, max_files=3000)
     graph = build_import_graph(root, max_files=3000)
 
     norm_path = file_path.replace("\\", "/")
@@ -654,7 +696,7 @@ def get_file_relations(file_path: str, root: Path) -> str:
         if norm_path in targets and source != norm_path:
             imported_by.append(source)
 
-    related_tests = _find_related_tests(norm_path, root, code_files)
+    related_tests = _find_related_tests_from_graph(norm_path, graph)
 
     lines = [f"# FILE RELATIONS: {norm_path}\n"]
 
@@ -1018,28 +1060,13 @@ def analyze_change_impact(file_path: str, root: Path) -> str:
             if current in targets and source not in visited:
                 queue.append(source)
 
-    code_files = _iter_code_files(root, max_files=3000)
-    related_tests: list[str] = []
-    file_stem = Path(norm_path).stem
-    for fpath, _ in code_files:
-        fname = fpath.name.lower()
-        if file_stem.lower() in fname and ("test" in fname or "spec" in fname):
-            try:
-                related_tests.append(str(fpath.relative_to(root)).replace("\\", "/"))
-            except ValueError:
-                pass
+    related_tests = _find_related_tests_from_graph(norm_path, graph)
 
     for dep in sorted(transitive):
-        dep_stem = Path(dep).stem
-        for fpath, _ in code_files:
-            fname = fpath.name.lower()
-            rel = str(fpath.relative_to(root)).replace("\\", "/")
-            if (
-                dep_stem.lower() in fname
-                and ("test" in fname or "spec" in fname)
-                and rel not in related_tests
-            ):
-                related_tests.append(rel)
+        dep_tests = _find_related_tests_from_graph(dep, graph)
+        for t in dep_tests:
+            if t not in related_tests:
+                related_tests.append(t)
 
     lines = [f"# CHANGE IMPACT ANALYSIS: `{norm_path}`\n"]
 
