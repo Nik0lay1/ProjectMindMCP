@@ -23,6 +23,8 @@ class VectorStoreManager:
         Args:
             collection_name: Name of the ChromaDB collection
         """
+        import time as _time
+
         self.collection_name = collection_name
         self.chroma_client: Any = None
         self.collection: Any = None
@@ -30,6 +32,30 @@ class VectorStoreManager:
         self._initialized = False
         self._query_cache = TTLCache(ttl_seconds=300, max_size=100)
         self._bm25_index = BM25Index(config.BM25_INDEX_PATH)
+        self._last_query_at: float = 0.0
+        self._loaded_at: float = 0.0
+        self._time = _time
+
+    def is_loaded(self) -> bool:
+        """Returns True iff the embedding model + collection are currently loaded.
+
+        Cheap, never triggers initialisation. Used by the maintenance daemon and
+        diagnostic tools.
+        """
+        return bool(self._initialized and self.collection is not None)
+
+    def unload_model(self) -> None:
+        """Releases the SentenceTransformer model and the Chroma collection.
+
+        Subsequent queries will lazily reload via `get_collection()`.
+        """
+        try:
+            self.embedding_fn = None
+            self.collection = None
+            self._initialized = False
+            self._query_cache.cache.clear() if hasattr(self._query_cache, "cache") else None
+        except Exception:
+            pass
 
     def initialize(self) -> bool:
         """
@@ -67,6 +93,7 @@ class VectorStoreManager:
             )
 
             self._initialized = True
+            self._loaded_at = self._time.time()
             logger.info("Vector Store initialized successfully")
             self._bm25_index.load()
             return True
@@ -164,6 +191,7 @@ class VectorStoreManager:
                 where_document=where_document,
             )
             self._query_cache.put(cache_key, result)
+            self._last_query_at = self._time.time()
             return result
         except Exception as e:
             logger.error(f"Error querying collection: {e}", exc_info=True)

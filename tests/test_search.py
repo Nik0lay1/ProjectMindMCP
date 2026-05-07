@@ -113,7 +113,8 @@ class TestSearchCodebase:
         """Test successful search with valid query."""
         from mcp_server import search_codebase
 
-        result = search_codebase("hello", n_results=5)
+        with patch("mcp_server._check_index_ready", return_value=None):
+            result = search_codebase("hello", n_results=5)
         assert "test.py" in result
         mock_vector_store.hybrid_query.assert_called_once()
 
@@ -124,7 +125,8 @@ class TestSearchCodebase:
         from mcp_server import search_codebase
 
         mock_vector_store.hybrid_query.return_value = {"documents": [[]], "metadatas": [[]]}
-        result = search_codebase("nonexistent")
+        with patch("mcp_server._check_index_ready", return_value=None):
+            result = search_codebase("nonexistent")
         assert "No matches found" in result
 
     def test_search_vector_store_not_initialized(
@@ -134,7 +136,8 @@ class TestSearchCodebase:
         from mcp_server import search_codebase
 
         mock_vector_store.hybrid_query.return_value = None
-        result = search_codebase("test")
+        with patch("mcp_server._check_index_ready", return_value=None):
+            result = search_codebase("test")
         assert "not initialized" in result.lower()
 
 
@@ -162,7 +165,8 @@ class TestSearchCodebaseAdvanced:
         """Test search with file type filter."""
         from mcp_server import search_codebase_advanced
 
-        result = search_codebase_advanced("test", file_types=[".py"])
+        with patch("mcp_server._check_index_ready", return_value=None):
+            result = search_codebase_advanced("test", file_types=[".py"])
         assert "test.py" in result or "world.py" in result
 
     def test_advanced_search_exclude_dirs(
@@ -176,7 +180,8 @@ class TestSearchCodebaseAdvanced:
             "metadatas": [[{"source": "tests/test.py"}, {"source": "src/main.py"}]],
             "distances": [[0.1, 0.2]],
         }
-        result = search_codebase_advanced("test", exclude_dirs=["tests"])
+        with patch("mcp_server._check_index_ready", return_value=None):
+            result = search_codebase_advanced("test", exclude_dirs=["tests"])
         assert "src/main.py" in result
         assert "tests/test.py" not in result
 

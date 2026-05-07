@@ -24,6 +24,25 @@ Every time you start a new AI session, your assistant forgets everything about y
 ### 🧠 Persistent Project Memory
 Save architectural decisions, tech stack notes, and context that survives across sessions. The AI reads this at the start of every conversation.
 
+Hierarchical memory access avoids dumping everything at once:
+- `read_memory_index()` — section headings only (cheap)
+- `read_memory_section(name)` — expand only the section you need
+
+### 🪜 3-Tier Hierarchical Search
+Queries escalate through tiers only when the previous one is insufficient — large repositories never trigger a cold load just to answer a path lookup.
+
+| Tier | Engine | When loaded | Typical latency |
+|---|---|---|---|
+| **L0 Manifest** | `.ai/manifest.json` (paths + symbols) | always | < 50 ms |
+| **L1 BM25** | `rank-bm25` lexical index | only when L0 weak | ~ 100 ms |
+| **L2 Vector** | ChromaDB + sentence-transformers | only on `intent='semantic'/'deep'` | first call ~ 30 s, then cached |
+
+Use the unified `query(text, intent, n_results)` tool with one of:
+- `overview` — L0 only (paths + top-level symbols)
+- `lookup` — L0 + L1 (keyword/lexical)
+- `semantic` — L0 + L1 + L2 (escalates to embeddings if signal is weak)
+- `deep` — L0 + L1 + L2 with relaxed thresholds
+
 ### 🔍 Semantic Code Search
 Search your codebase by *meaning*, not just text. Powered by a local `sentence-transformers` model — no OpenAI key needed.
 
@@ -48,7 +67,7 @@ Unlike naive text splitters that cut code in the middle of a function, ProjectMi
 - **Cached import graph** (120s TTL) — repeated calls return instantly instead of re-scanning the filesystem
 
 ### ⚡ Instant Project Exploration (no indexing needed)
-- `get_project_overview()` — tech stack, git info, file stats in < 1 second
+- `get_project_overview()` — manifest-first; tech stack, git info, file stats in < 1 second
 - `explore_directory(path)` — browse project tree level by level
 - `get_file_summary(path)` — imports, classes, functions, git history
 
@@ -62,8 +81,26 @@ Two search engines combined via **Reciprocal Rank Fusion (RRF)**:
 ### 🔄 Incremental Indexing
 Only re-indexes changed files — 10-100x faster than full re-indexing.
 
+### 🩺 Self-Healing Maintenance Daemon
+A background thread keeps the index lean without user intervention. State persists in `.ai/maintenance_state.json`.
+
+| Task | Trigger | Action |
+|---|---|---|
+| `manifest_refresh` | every 5 min | rebuild L0 manifest if files changed |
+| `stale_gc` | hourly | delete embeddings for files removed from disk |
+| `db_compaction` | daily | `VACUUM` ChromaDB SQLite when > 200 MB |
+| `log_truncate` | every 6 h | truncate `projectmind.log` when > 8 MB |
+| `model_unload` | every 5 min | release `sentence-transformers` after 15 min idle |
+| `cache_pressure` | every minute | drop file/query caches when RSS > 500 MB |
+
+Inspect with `maintenance_status()`; force a sync run with `maintenance_run()`; aggressively clean the index with `prune_index(force=True)`.
+
 ### 📊 Code Quality Metrics
 Cyclomatic complexity, pylint scores, test coverage tracking — all queryable via MCP tools.
+Both `analyze_code_complexity` and `analyze_code_quality` accept `mode='quick'` (default, fast) or `mode='deep'` (wider scan).
+
+### ⚡ Lazy `session_init` (no more 30s timeouts)
+`session_init` no longer loads the embedding model or runs an incremental reindex; it returns the project root + manifest + memory index in well under a second even on multi-GB repositories. The vector store is loaded only when an `intent='semantic'` or `'deep'` query actually needs it.
 
 ---
 
@@ -128,18 +165,20 @@ Or run directly for large projects:
 
 ---
 
-## Available Tools (40+)
+## Available Tools (45+)
 
 | Category | Tools |
 |---|---|
-| **Memory** | `read_memory`, `update_memory`, `clear_memory`, `save_memory_version` |
-| **Search** | `search_codebase`, `search_for_feature`, `search_architecture`, `search_for_errors` |
+| **Session** | `session_init`, `health`, `set_project_root` |
+| **Memory** | `read_memory`, `read_memory_index`, `read_memory_section`, `update_memory`, `clear_memory`, `save_memory_version` |
+| **Search** | `query` (tier-aware), `search_codebase`, `search_for_feature`, `search_architecture`, `search_for_errors` |
 | **Exploration** | `get_project_overview`, `explore_directory`, `get_file_summary` |
 | **Dependencies** | `get_file_relations`, `get_dependencies_with_depth`, `get_module_cluster`, `find_dependency_path` |
-| **Indexing** | `index_codebase`, `index_changed_files`, `get_index_stats` |
+| **Indexing** | `index_codebase`, `index_changed_files`, `get_index_stats`, `prune_index` |
 | **Git** | `ingest_git_history`, `get_recent_changes_summary`, `auto_update_memory_from_commits` |
 | **Quality** | `analyze_code_complexity`, `analyze_code_quality`, `get_test_coverage_info` |
-| **Project** | `set_project_root`, `detect_project_conventions`, `generate_project_summary` |
+| **Maintenance** | `maintenance_status`, `maintenance_run` |
+| **Project** | `detect_project_conventions`, `generate_project_summary` |
 
 Full reference: [docs/api/tools-reference.md](docs/api/tools-reference.md)
 
@@ -153,9 +192,13 @@ Your Project
      ▼
 ProjectMind MCP Server
      │
-     ├── .ai/memory.md          ← persistent notes & decisions
-     ├── .ai/vector_store/      ← ChromaDB embeddings (local)
-     └── .ai/index_metadata.json ← tracks changed files
+     ├── .ai/memory.md                ← persistent notes & decisions
+     ├── .ai/manifest.json            ← L0: paths, symbols, modules (≤200 KB)
+     ├── .ai/bm25_index/              ← L1: lexical index
+     ├── .ai/vector_store/            ← L2: ChromaDB embeddings (local)
+     ├── .ai/index_metadata.json      ← tracks changed files
+     ├── .ai/maintenance_state.json   ← self-healing daemon schedule
+     └── .ai/.indexignore             ← per-project ignore patterns
      │
      ▼
 AI Assistant (Claude / Zencoder / Cursor)
@@ -204,8 +247,11 @@ Custom ignore patterns: create `.ai/.indexignore` (same syntax as `.gitignore`).
 ```
 mcp_server.py           ← all MCP tool definitions
 config.py               ← configuration
-vector_store_manager.py ← ChromaDB wrapper + hybrid search
-bm25_index.py           ← BM25 keyword index + RRF fusion
+manifest.py             ← L0 lightweight project manifest
+query_router.py         ← tier-aware query() router (L0 → L1 → L2)
+maintenance.py          ← self-healing background daemon
+vector_store_manager.py ← ChromaDB wrapper + hybrid search (L2)
+bm25_index.py           ← BM25 keyword index + RRF fusion (L1)
 codebase_indexer.py     ← file scanning & AST-aware chunking
 ast_splitter.py         ← tree-sitter parser (9 languages)
 code_intelligence.py    ← import graph, complexity analysis, cached graph

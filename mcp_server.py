@@ -257,10 +257,15 @@ def session_init(project_path: str = "") -> str:
     Performs:
       1. Sets project root (if `project_path` is provided).
       2. Warns if the chosen root is the MCP server's own directory.
-      3. Reads `.ai/memory.md`.
-      4. Reports vector-index status.
-      5. Runs incremental re-indexing for files changed since last session
-         (skipped if the index has not been built yet).
+      3. Reads `.ai/memory.md` (only the index/headings — full text on demand).
+      4. Refreshes the lightweight L0 manifest.
+      5. Reports vector-index status (without loading it).
+      6. Starts the self-healing maintenance daemon.
+
+    The heavy vector store / embedding model is NEVER loaded here — it is
+    lazily loaded only when a semantic query needs it. This keeps
+    `session_init` well under the MCP 30s tool timeout even on multi-GB
+    repositories.
 
     Args:
         project_path: Absolute path to the target project. Leave empty to use
@@ -304,39 +309,73 @@ def session_init(project_path: str = "") -> str:
     elif chunks == 0:
         sections.append("**Index status**: empty. Run `index_codebase(force=True)` to rebuild.")
     else:
-        sections.append(f"**Index status**: {chunks} chunks.")
+        sections.append(f"**Index status**: {chunks} chunks (loaded lazily).")
 
+    # Manifest (L0) — fast, no model load.
+    try:
+        from manifest import get_or_build_manifest, quick_overview_from_manifest
+
+        m = get_or_build_manifest()
+        sections.append(
+            "## Manifest\n"
+            f"- {m.stats.indexed_files} indexable files / {m.stats.total_files} total\n"
+            f"- {m.stats.total_size_bytes / (1024 * 1024):.1f} MB, "
+            f"refreshed in {m.duration_ms} ms\n"
+            f"- top modules: " + ", ".join(f"`{mod.name}/`" for mod in m.modules[:5])
+        )
+        sections.append("### Quick overview\n" + quick_overview_from_manifest(m))
+    except Exception as e:
+        sections.append(f"## Manifest\n_skipped: {e}_")
+
+    # Memory: only headings + first lines so we don't dump everything up front.
     try:
         if config.MEMORY_FILE.exists():
-            content = config.MEMORY_FILE.read_text(encoding="utf-8", errors="ignore")
-            lines = content.split("\n")
-            preview = "\n".join(lines[:60])
-            remaining = max(0, len(lines) - 60)
-            suffix = (
-                f"\n\n_... {remaining} more lines. Call `read_memory(max_lines=None)` for full content._"
-                if remaining
-                else ""
-            )
-            sections.append("## Memory\n" + preview + suffix)
+            sections.append("## Memory (index)\n" + _memory_index_markdown())
         else:
             sections.append("## Memory\n_No memory file yet. It will be created on first update._")
     except Exception as e:
         sections.append(f"## Memory\n_Error reading memory: {e}_")
 
-    if chunks is not None and chunks > 0:
-        try:
-            ctx = get_context()
-            if ctx.vector_store.get_collection() is not None:
-                ignored_dirs = get_ignored_dirs()
-                ignore_patterns = load_index_ignore_patterns()
-                inc_result = ctx.indexer.index_changed(
-                    config.PROJECT_ROOT, ignored_dirs, ignore_patterns
-                )
-                sections.append(f"## Incremental re-index\n{inc_result}")
-        except Exception as e:
-            sections.append(f"## Incremental re-index\n_Skipped: {e}_")
+    # Self-healing daemon
+    try:
+        from maintenance import start_daemon
 
+        started = start_daemon()
+        sections.append(
+            "## Maintenance\n" + ("daemon started" if started else "daemon already running")
+        )
+    except Exception as e:
+        sections.append(f"## Maintenance\n_Could not start daemon: {e}_")
+
+    sections.append(
+        "_Tip: use `query(text, intent='overview'|'lookup'|'semantic'|'deep')` "
+        "for tier-aware search; `read_memory_section(name)` for targeted memory access._"
+    )
     return "\n\n".join(sections)
+
+
+def _memory_index_markdown() -> str:
+    """Returns just the headings of memory.md plus a 1-line preview each."""
+    try:
+        text = config.MEMORY_FILE.read_text(encoding="utf-8", errors="ignore")
+    except Exception as e:
+        return f"_unreadable: {e}_"
+    lines = text.split("\n")
+    out: list[str] = []
+    pending: tuple[str, int] | None = None  # (heading, line_index)
+    for i, ln in enumerate(lines):
+        if ln.startswith("#"):
+            if pending is not None:
+                out.append(f"- {pending[0]}")
+            pending = (ln.strip(), i)
+    if pending is not None:
+        out.append(f"- {pending[0]}")
+    if not out:
+        return "_empty_"
+    out.append(
+        f"\n_{len(lines)} lines total. Use `read_memory_section(name)` to expand a section._"
+    )
+    return "\n".join(out)
 
 
 def load_index_ignore_patterns() -> set[str]:
@@ -424,9 +463,21 @@ def get_project_overview() -> str:
     """
     ensure_startup()
     try:
+        # Manifest first — closes ~80% of "what is this project" questions
+        # in <50 ms without touching the vector store.
+        try:
+            from manifest import get_or_build_manifest, quick_overview_from_manifest
+
+            m = get_or_build_manifest()
+            quick = quick_overview_from_manifest(m)
+        except Exception:
+            quick = ""
+
         root = config.PROJECT_ROOT
         overview = [f"# PROJECT OVERVIEW: {root.name}\n"]
         overview.append(f"**Root**: `{root}`")
+        if quick:
+            overview.append("\n" + quick)
 
         git_repo = _get_git_repo_safe()
         if git_repo:
@@ -2309,7 +2360,10 @@ def auto_update_memory_from_commits(days: int = 7, auto_summarize: bool = True) 
 
 
 @mcp.tool()
-def analyze_code_complexity(target_path: str = ".") -> str:
+def analyze_code_complexity(target_path: str = ".", mode: str = "quick") -> str:
+    """Analyze cyclomatic complexity. mode='quick' (100 files) or 'deep' (1000)."""
+    quick = (mode or "quick").lower() != "deep"
+    file_cap = 100 if quick else 1000
     try:
         target = validate_path(target_path)
         if not target.exists():
@@ -2336,7 +2390,7 @@ def analyze_code_complexity(target_path: str = ".") -> str:
         if not all_files:
             return "No supported files found (Python, JS, TS, Java, Go, Rust, Ruby)"
 
-        for src_file in all_files[:100]:
+        for src_file in all_files[:file_cap]:
             lang = _LANGUAGE_MAP.get(src_file.suffix.lower(), "unknown")
 
             if lang == "python":
@@ -2368,7 +2422,7 @@ def analyze_code_complexity(target_path: str = ".") -> str:
                 lang_counts[lang] = lang_counts.get(lang, 0) + 1
 
         if not file_count:
-            return "No functions found to analyze"
+            return "# CODE COMPLEXITY ANALYSIS\n\nNo functions found to analyze"
 
         if high_complexity:
             results.append("## High Complexity Functions (>10)")
@@ -2395,7 +2449,10 @@ def analyze_code_complexity(target_path: str = ".") -> str:
 
 
 @mcp.tool()
-def analyze_code_quality(target_path: str = ".", max_files: int = 10) -> str:
+def analyze_code_quality(target_path: str = ".", max_files: int = 10, mode: str = "quick") -> str:
+    """Pylint-based quality scan. mode='deep' raises max_files cap to 100."""
+    if (mode or "quick").lower() == "deep":
+        max_files = max(max_files, 100)
     try:
         from io import StringIO
 
@@ -2567,6 +2624,205 @@ def get_cache_stats() -> str:
     return result
 
 
+@mcp.tool()
+def query(text: str, intent: str = "lookup", n_results: int = 8) -> str:
+    """
+    Tier-aware project query. Cheaper than `search_codebase`.
+
+    Routes through L0 (manifest), then L1 (BM25), then L2 (vector embeddings),
+    escalating only when the previous tier yields a weak signal.
+
+    Args:
+        text: Free-form query.
+        intent: "overview" | "lookup" | "semantic" | "deep".
+                - overview: L0 only — paths and symbols. Always sub-second.
+                - lookup:   L0 + L1 — keyword/lexical search.
+                - semantic: L0 + L1 + L2 — pulls in embeddings if signal is weak.
+                - deep:     L0 + L1 + L2 — relaxed thresholds, more results.
+        n_results: Final number of merged hits to return (1-50).
+    """
+    n_results = max(1, min(int(n_results or 8), 50))
+    try:
+        from query_router import query as _q
+
+        result = _q(text, intent=intent, n_results=n_results)
+        return result.to_markdown()
+    except Exception as e:
+        return f"Error in query(): {e}"
+
+
+@mcp.tool()
+def read_memory_index() -> str:
+    """
+    Returns just the section headings from `.ai/memory.md` plus a short tip.
+
+    Use this for an initial cheap scan; then call `read_memory_section(name)`
+    to expand only the section you actually need.
+    """
+    if not config.MEMORY_FILE.exists():
+        return "Memory file not found."
+    return _memory_index_markdown()
+
+
+@mcp.tool()
+def read_memory_section(section_name: str, max_lines: int = 200) -> str:
+    """
+    Returns the contents of a single `## Heading` section from memory.md.
+
+    Args:
+        section_name: Case-insensitive section heading (without leading `#`).
+        max_lines: Max lines of body to return (truncated with a tip).
+    """
+    if not section_name or not section_name.strip():
+        return "Error: section_name is required."
+    if not config.MEMORY_FILE.exists():
+        return "Memory file not found."
+    try:
+        text = config.MEMORY_FILE.read_text(encoding="utf-8", errors="ignore")
+    except Exception as e:
+        return f"Error reading memory: {e}"
+
+    target = section_name.strip().lower()
+    lines = text.split("\n")
+    body: list[str] = []
+    in_section = False
+    section_level = 0
+    for ln in lines:
+        if ln.startswith("#"):
+            stripped = ln.lstrip("#").strip()
+            level = len(ln) - len(ln.lstrip("#"))
+            if in_section and level <= section_level:
+                break
+            if not in_section and stripped.lower() == target:
+                in_section = True
+                section_level = level
+                body.append(ln)
+                continue
+        if in_section:
+            body.append(ln)
+    if not body:
+        return f"Section '{section_name}' not found. Use `read_memory_index()` to list."
+    if len(body) > max_lines:
+        kept = "\n".join(body[:max_lines])
+        return (
+            kept + f"\n\n_... {len(body) - max_lines} more lines truncated. "
+            "Re-call with larger `max_lines` or use `read_memory(max_lines=None)`._"
+        )
+    return "\n".join(body)
+
+
+@mcp.tool()
+def maintenance_status() -> str:
+    """Reports the self-healing daemon's status, schedule, and recent history."""
+    try:
+        from maintenance import get_status
+
+        s = get_status()
+        lines = ["# MAINTENANCE STATUS"]
+        lines.append(f"- **Daemon alive**: {s['daemon_alive']}")
+        lines.append(f"- **Vector DB**: {s['vector_db_mb']} MB")
+        lines.append(f"- **Log**: {s['log_mb']} MB")
+        lines.append(f"- **Process RSS**: {s['process_rss_mb']} MB")
+        lines.append("\n## Schedule")
+        for t in s["schedule"]:
+            age = t["last_run_age_s"]
+            lines.append(
+                f"- `{t['task']}` — last {age}s ago, next in {t['next_in_s']}s "
+                f"(interval {t['interval_s']}s)"
+            )
+        if s["recent_history"]:
+            lines.append("\n## Recent")
+            for h in s["recent_history"][:10]:
+                ok = "OK" if h["ok"] else "FAIL"
+                lines.append(f"- [{ok}] `{h['task']}`: {h['detail']}")
+        return "\n".join(lines)
+    except Exception as e:
+        return f"Error: {e}"
+
+
+@mcp.tool()
+def maintenance_run() -> str:
+    """Synchronously run every self-healing task once. Returns a per-task report."""
+    try:
+        from maintenance import run_all_now
+
+        results = run_all_now()
+        out = ["# MAINTENANCE RUN"]
+        for k, v in results.items():
+            out.append(f"- **{k}**: {v}")
+        return "\n".join(out)
+    except Exception as e:
+        return f"Error: {e}"
+
+
+@mcp.tool()
+def prune_index(force: bool = False) -> str:
+    """
+    Aggressively prunes the vector index: drops orphan chunks and runs VACUUM.
+    Pass `force=True` to delete and rebuild the entire collection from scratch.
+    """
+    from maintenance import load_state, save_state, task_compact_db, task_gc_stale_chunks
+
+    state = load_state()
+    out = ["# PRUNE INDEX"]
+    if force:
+        try:
+            ctx = get_context()
+            err = ctx.vector_store.clear_collection()
+            if err:
+                out.append(f"- clear: {err}")
+            else:
+                out.append("- collection cleared (run `index_codebase()` to rebuild)")
+        except Exception as e:
+            out.append(f"- clear failed: {e}")
+    out.append(f"- gc: {task_gc_stale_chunks(state)}")
+    out.append(f"- vacuum: {task_compact_db(state)}")
+    save_state(state)
+    return "\n".join(out)
+
+
+def _ensure_default_indexignore() -> None:
+    """Creates a sensible default `.indexignore` if none exists, only on first run."""
+    target = config.AI_DIR / ".indexignore"
+    root_target = config.PROJECT_ROOT / ".indexignore"
+    if root_target.exists() or target.exists():
+        return
+    try:
+        config.AI_DIR.mkdir(parents=True, exist_ok=True)
+        target.write_text(
+            "# ProjectMind index-ignore patterns (substring match on full path).\n"
+            "# Edit freely; one pattern per line.\n"
+            "node_modules\n"
+            ".next\n"
+            "dist\n"
+            "build\n"
+            "coverage\n"
+            ".cache\n"
+            ".turbo\n"
+            ".vercel\n"
+            "playwright-report\n"
+            "__snapshots__\n"
+            ".pytest_cache\n"
+            ".mypy_cache\n"
+            "*.min.js\n"
+            "*.min.css\n"
+            "package-lock.json\n"
+            "yarn.lock\n"
+            "pnpm-lock.yaml\n",
+            encoding="utf-8",
+        )
+        log(f"Default .indexignore created at {target}")
+    except Exception as e:
+        log(f"Could not create default .indexignore: {e}")
+
+
 if __name__ == "__main__":
     ensure_startup()
+    _ensure_default_indexignore()
+    try:
+        from maintenance import start_daemon
+
+        start_daemon()
+    except Exception as e:
+        log(f"Maintenance daemon could not be started: {e}")
     mcp.run()

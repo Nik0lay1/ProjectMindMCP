@@ -11,12 +11,13 @@ from incremental_indexing import IndexMetadata, atomic_write
 
 
 class TestAtomicWrite(unittest.TestCase):
+    @patch("pathlib.Path.mkdir")
     @patch("incremental_indexing.tempfile.mkstemp")
     @patch("incremental_indexing.os.fdopen")
     @patch("incremental_indexing.os.replace")
     @patch("incremental_indexing.os.fsync")
     def test_atomic_write_creates_temp_and_replaces(
-        self, mock_fsync, mock_replace, mock_fdopen, mock_mkstemp
+        self, mock_fsync, mock_replace, mock_fdopen, mock_mkstemp, mock_mkdir
     ):
         """Test that atomic_write creates temp file and replaces original"""
         mock_mkstemp.return_value = (42, "/tmp/.test.json.tmp")
@@ -33,13 +34,14 @@ class TestAtomicWrite(unittest.TestCase):
         mock_fsync.assert_called_once()
         mock_replace.assert_called_once_with("/tmp/.test.json.tmp", test_path)
 
+    @patch("pathlib.Path.mkdir")
     @patch("incremental_indexing.tempfile.mkstemp")
     @patch("incremental_indexing.os.fdopen")
     @patch("incremental_indexing.os.replace")
     @patch("incremental_indexing.os.unlink")
     @patch("incremental_indexing.os.fsync")
     def test_atomic_write_cleanup_on_error(
-        self, mock_fsync, mock_unlink, mock_replace, mock_fdopen, mock_mkstemp
+        self, mock_fsync, mock_unlink, mock_replace, mock_fdopen, mock_mkstemp, mock_mkdir
     ):
         """Test that temp file is cleaned up on error"""
         temp_path = "/tmp/.test.json.tmp"

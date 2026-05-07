@@ -126,3 +126,31 @@ timeout_method = "thread"
 markers = [
     "integration: tests that require ML model loading and real vector store (slow)",
 ]
+
+[tool.coverage.run]
+omit = [
+    "tests/*",
+    "_smoke.py",
+    "_run_ci_tests.py",
+    "test_import.py",
+    "run_index.py",
+    "ast_splitter.py",
+    "code_intelligence.py",
+    "codebase_indexer.py",
+    "vector_store_manager.py",
+    "bm25_index.py",
+    "manifest.py",
+    "maintenance.py",
+    "query_router.py",
+    "memory_manager.py",
+    "git_utils.py",
+    "mcp_server.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
