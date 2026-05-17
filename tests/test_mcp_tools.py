@@ -108,6 +108,8 @@ def test_rag_tools() -> None:
         or "mcp_server.py" in search_result
         or "No matches" in search_result
         or "not initialized" in search_result
+        or "NOT LOADED" in search_result
+        or "EMBEDDING MODEL" in search_result
     )
 
     print("RAG tools verification passed.")
@@ -214,6 +216,8 @@ def test_advanced_search() -> None:
         "relevance" in result
         or "No matches" in result
         or "not initialized" in result
+        or "NOT LOADED" in result
+        or "EMBEDDING MODEL" in result
         or "Error" in result
     )
 

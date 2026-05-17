@@ -146,17 +146,34 @@ def _tier_l1(query: str, n: int) -> list[QueryHit]:
     return hits
 
 
+_L2_TIMEOUT_SECONDS = 20.0
+
+
 def _tier_l2(query: str, n: int) -> list[QueryHit]:
-    """Semantic vector search. Loads embedding model on first use."""
+    """Semantic vector search. Only runs if model is already loaded (avoids MCP timeout)."""
+    import concurrent.futures
+
     try:
         from context import get_context
 
         ctx = get_context()
         vs = ctx.vector_store
+
+        if not vs.is_loaded():
+            logger.debug("L2 skipped: embedding model not loaded yet")
+            return []
+
         coll = vs.get_collection()
         if coll is None:
             return []
-        raw = vs.hybrid_query(query_texts=[query], n_results=n)
+
+        try:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(vs.hybrid_query, [query], n)
+                raw = future.result(timeout=_L2_TIMEOUT_SECONDS)
+        except concurrent.futures.TimeoutError:
+            logger.warning(f"L2 hybrid_query timed out after {_L2_TIMEOUT_SECONDS}s")
+            return []
     except Exception as e:
         logger.warning(f"L2 vector query failed: {e}")
         return []
@@ -259,13 +276,25 @@ def query(
         merged_so_far = _merge_hits(buckets, n_results)
         weak_signal = not merged_so_far or merged_so_far[0].score < 0.4 or intent == "deep"
         if weak_signal:
-            l2_n = max(n_results * 2, 12) if intent == "deep" else n_results
-            l2 = _tier_l2(user_query, n=l2_n)
-            if l2:
-                tiers_used.append("L2")
-                buckets.append(l2)
+            try:
+                from context import get_context as _get_ctx
+
+                _l2_loaded = _get_ctx().vector_store.is_loaded()
+            except Exception:
+                _l2_loaded = False
+            if not _l2_loaded:
+                notes.append(
+                    "L2 (vector) skipped: embedding model not loaded yet — "
+                    "run `index_codebase()` to load it"
+                )
             else:
-                notes.append("vector tier unavailable; index may be empty")
+                l2_n = max(n_results * 2, 12) if intent == "deep" else n_results
+                l2 = _tier_l2(user_query, n=l2_n)
+                if l2:
+                    tiers_used.append("L2")
+                    buckets.append(l2)
+                else:
+                    notes.append("vector tier unavailable; index may be empty")
 
     final = _merge_hits(buckets, n_results)
     if not final:

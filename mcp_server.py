@@ -117,6 +117,25 @@ def ensure_startup() -> None:
 mcp = FastMCP("ProjectMind")
 
 
+def _check_model_loaded() -> str | None:
+    """Returns an error message if the embedding model is not loaded, or None if OK.
+
+    Must be called *after* _check_index_ready() (which confirms the SQLite DB exists).
+    Avoids triggering slow model initialization inside a time-bounded MCP tool call.
+    """
+    try:
+        vs = get_context().vector_store
+        if not vs.is_loaded():
+            return (
+                "⚠️ EMBEDDING MODEL NOT LOADED. The vector index exists but the model "
+                "is not in memory yet (server may have restarted).\n"
+                "Run `index_codebase()` once to reload it, then retry this tool."
+            )
+    except Exception:
+        pass
+    return None
+
+
 def _check_index_ready() -> str | None:
     """Returns an error message string if the index is not ready, or None if OK."""
     import sqlite3
@@ -1211,6 +1230,10 @@ def search_with_dependencies(
     if err:
         return err
 
+    err = _check_model_loaded()
+    if err:
+        return err
+
     try:
         # First do semantic search
         ctx = get_context()
@@ -1294,6 +1317,10 @@ def search_for_errors(error_text: str, stacktrace: str = "", n_results: int = 5)
         return "Error: error_text cannot be empty"
 
     err = _check_index_ready()
+    if err:
+        return err
+
+    err = _check_model_loaded()
     if err:
         return err
 
@@ -1403,6 +1430,10 @@ def search_for_feature(feature_name: str, n_results: int = 10) -> str:
         return "Error: feature_name cannot be empty"
 
     err = _check_index_ready()
+    if err:
+        return err
+
+    err = _check_model_loaded()
     if err:
         return err
 
@@ -1522,6 +1553,10 @@ def search_architecture(component: str, n_results: int = 10) -> str:
         return "Error: component cannot be empty"
 
     err = _check_index_ready()
+    if err:
+        return err
+
+    err = _check_model_loaded()
     if err:
         return err
 
@@ -1814,6 +1849,10 @@ def search_codebase(query: str, n_results: int = 5) -> str:
         return "Error: n_results cannot exceed 50."
 
     err = _check_index_ready()
+    if err:
+        return err
+
+    err = _check_model_loaded()
     if err:
         return err
 
@@ -2286,6 +2325,10 @@ def search_codebase_advanced(
         return "Error: min_relevance must be between 0 and 1."
 
     err = _check_index_ready()
+    if err:
+        return err
+
+    err = _check_model_loaded()
     if err:
         return err
 
